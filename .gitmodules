@@ -1,6 +1,11 @@
 [submodule "lib/llama.cpp"]
 	path = lib/llama.cpp
 	url = https://github.com/ggml-org/llama.cpp.git
+[submodule "lib/lib/godot-cpp"]
+	path = lib/lib/godot-cpp
+	url = https://github.com/godotengine/godot-cpp
+	branch = 4.4
 [submodule "lib/godot-cpp"]
 	path = lib/godot-cpp
-	url = https://github.com/godotengine/godot-cpp.git
+	url = https://github.com/godotengine/godot-cpp
+	branch = 4.4
