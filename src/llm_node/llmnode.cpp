@@ -14,7 +14,7 @@ LLMNode::LLMNode() {
     ggml_backend_load_all();
 
     // Get absolute path to the addon directory
-    String gd_path = "res://addons/salmon/bin/models/model.gguf";
+    String gd_path = "res://addons/salmon/models/model.gguf";
     String abs_path = ProjectSettings::get_singleton()->globalize_path(gd_path);
     model_path = abs_path.utf8().get_data();
     UtilityFunctions::print("Resolved model path: " + abs_path);

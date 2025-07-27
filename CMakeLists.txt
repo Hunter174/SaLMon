@@ -1,3 +1,7 @@
+# Here is how to run
+# cmake -G "MinGW Makefiles" -DCMAKE_SH="CMAKE_SH-NOTFOUND" ..
+# mingw32-make
+
 cmake_minimum_required(VERSION 3.16)
 project(salmon)
 
