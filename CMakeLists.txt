@@ -69,9 +69,9 @@ set(OS_NAME "windows")
 set(ARCH "x86_64")
 set_target_properties(salmon PROPERTIES
         OUTPUT_NAME "salmon.${OS_NAME}.template_debug.${ARCH}"
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/addons/salmon/bin"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/addons/salmon/bin"
-        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/addons/salmon/bin"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/addons/salmon/bin"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/addons/salmon/bin"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/addons/salmon/bin"
 )
 
 # 💻 Windows-specific
