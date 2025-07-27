@@ -1,41 +1,61 @@
-# Prerequisites
+# === General C/C++ ===
 *.d
-
-# Compiled Object files
 *.slo
 *.lo
 *.o
 *.obj
-
-# Precompiled Headers
 *.gch
 *.pch
-
-# Linker files
 *.ilk
-
-# Debugger Files
 *.pdb
-
-# Compiled Dynamic libraries
 *.so
 *.dylib
 *.dll
-
-# Fortran module files
 *.mod
 *.smod
-
-# Compiled Static libraries
 *.lai
 *.la
 *.a
 *.lib
-
-# Executables
 *.exe
 *.out
 *.app
-
-# debug information files
 *.dwo
+*.make
+*.dblite
+*.gguf
+*.cmake
+*.obj
+*.ts
+
+
+# === Build artifacts ===
+/build/
+build
+src/models
+
+# === Godot C++ Bindings ===
+/lib/godot-cpp/bin/
+/lib/godot-cpp/gen/
+/lib/godot-cpp/build/
+
+# === llama.cpp artifacts ===
+/lib/llama.cpp/build/
+/lib/llama.cpp/bin/
+/lib/llama.cpp/ggml-metal.metal
+/lib/llama.cpp/ggml-metal.metal.map
+
+# === Editor/IDE Files ===
+*.log
+*.user
+*.sdf
+*.suo
+*.VC.db
+.vscode/
+.idea/
+
+# === Godot metadata (optional if included elsewhere) ===
+.export/
+
+# === Othere Folders ===
+

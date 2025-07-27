@@ -1,7 +1,7 @@
 [configuration]
 entry_symbol = "salmon_library_init"
-compatibility_minimum = 4.2
+compatibility_minimum = "4.4"
+reloadable = true
 
 [libraries]
-Windows.64 = "res://bin/salmon.dll"
-Linux.64 = "res://bin/salmon.so"
+windows.debug.x86_64 = "res://addons/salmon/bin/salmon.windows.template_debug.x86_64.dll"
