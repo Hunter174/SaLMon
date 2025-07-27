@@ -14,13 +14,23 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Create zip archive (only addons + selected files)
+      - name: Prepare addons folder
         run: |
-          FILES="addons README.md"
-          [ -f LICENSE ] && FILES="$FILES LICENSE"
-          [ -f project.godot ] && FILES="$FILES project.godot"
-          [ -f icon.png ] && FILES="$FILES icon.png"
-          zip -r salmon-addon.zip $FILES -x "addons/**/.git*" "addons/**/CMakeFiles/*" "addons/**/build/*"
+          mkdir -p addons/salmon/bin
+          # Copy binaries if they exist
+          cp salmon/bin/*.dll addons/salmon/bin/ 2>/dev/null || true
+          cp salmon/bin/*.a addons/salmon/bin/ 2>/dev/null || true
+          # Copy required extension and scripts
+          cp salmon/salmon.gdextension addons/salmon/ 2>/dev/null || true
+          cp salmon/model_download.bat addons/salmon/ 2>/dev/null || true
+          cp salmon/model_download.sh addons/salmon/ 2>/dev/null || true
+          # Copy license & readme to the addon root
+          cp LICENSE addons/salmon/ 2>/dev/null || true
+          cp README.md addons/salmon/ 2>/dev/null || true
+
+      - name: Zip into correct structure
+        run: |
+          zip -r salmon-addon.zip addons LICENSE README.md
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v1
