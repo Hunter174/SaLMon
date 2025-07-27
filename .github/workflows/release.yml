@@ -1,8 +1,10 @@
-name: Build and Upload Addon
+name: Release Salmon Addon
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build-and-release:
