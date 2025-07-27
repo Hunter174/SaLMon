@@ -1,0 +1,28 @@
+name: Release SaLMon
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Create zip archive
+        run: |
+          FILES="addons README.md"
+          [ -f LICENSE ] && FILES="$FILES LICENSE"
+          [ -f project.godot ] && FILES="$FILES project.godot"
+          [ -f icon.png ] && FILES="$FILES icon.png"
+          zip -r salmon-addon.zip $FILES
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: salmon-addon.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
