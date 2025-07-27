@@ -1,4 +1,4 @@
-name: Release SaLMon
+name: Build and Upload Addon
 
 on:
   release:
@@ -12,13 +12,13 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Create zip archive
+      - name: Create zip archive (only addons + selected files)
         run: |
           FILES="addons README.md"
           [ -f LICENSE ] && FILES="$FILES LICENSE"
           [ -f project.godot ] && FILES="$FILES project.godot"
           [ -f icon.png ] && FILES="$FILES icon.png"
-          zip -r salmon-addon.zip $FILES
+          zip -r salmon-addon.zip $FILES -x "addons/**/.git*" "addons/**/CMakeFiles/*" "addons/**/build/*"
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v1
