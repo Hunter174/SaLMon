@@ -47,6 +47,11 @@ target_compile_definitions(salmon PRIVATE
 # 🔗 Link llama.cpp statically
 target_link_libraries(salmon PRIVATE llama)
 
+# ✅ Link std::filesystem for MinGW if needed
+if (MINGW)
+    target_link_libraries(salmon PRIVATE stdc++fs)
+endif()
+
 # 🎯 Link Godot static lib
 target_link_directories(salmon PRIVATE ${GODOT_CPP_PATH}/bin)
 target_link_libraries(salmon PRIVATE ${GODOT_CPP_PATH}/bin/libgodot-cpp.windows.template_debug.x86_64.a)
