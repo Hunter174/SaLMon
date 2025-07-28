@@ -12,13 +12,15 @@
 - Configurable **context length** and **max new tokens**
 
 ---
+> The only directly supported OS is Windows I have yet to build the binaries for Mac and Linux
+---
 
 ## Installation
 
 1. **Copy the `salmon` folder** into the `addons` directory of your Godot project.
 2. **Obtain a GGUF model**:
     - You can download a small example model from Hugging Face (e.g., `SmolLM2` or `Llama-3.2-1B`).
-    - Use your own GGUF-compatible model if desired.
+    - Use your own GGUF-compatible model if desired. (Information on supported GGUF models can be found [llama.cpp](https://github.com/ggerganov/llama.cpp))
 3. **Place the model file** at: ``res://addons/salmon/models/model.gguf`` -> the default model name is models.gguf
 4. **Ensure the compiled library** (`.dll`, `.so`, or `.dylib` depending on your platform) is located in:
 5. Enable the addon in **Project > Project Settings > Plugins**.
