@@ -7,6 +7,7 @@
 #include <numeric>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using salmon::Option;
@@ -68,13 +69,35 @@ std::vector<Fixture> fixtures() {
 }
 
 struct Trial {
-    std::string selected;
-    float margin = 0;
+    std::string raw_selected;
+    std::string calibrated_selected;
+    float raw_margin = 0;
+    float calibrated_margin = 0;
     double milliseconds = 0;
+    std::vector<float> raw_logits;
 };
 
+float score_margin(const std::vector<float> &scores) {
+    std::vector<float> sorted = scores;
+    std::sort(sorted.begin(), sorted.end(), std::greater<float>());
+    return sorted.size() > 1 ? sorted[0] - sorted[1] : 1.0f;
+}
+
+std::vector<float> label_priors(salmon::Backend &backend, salmon::Id model, size_t count,
+                                std::atomic_bool &cancelled) {
+    Request request;
+    request.operation = salmon::Operation::Decide;
+    request.model = model;
+    request.state = "No facts are available. Every candidate is equally suitable and has no advantage.";
+    request.question = "Choose among these deliberately equivalent neutral candidates.";
+    for (size_t i = 0; i < count; ++i)
+        request.options.push_back({"neutral_" + std::to_string(i), "An equivalent neutral candidate with no advantage"});
+    return backend.execute(request, cancelled, {}).logits;
+}
+
 Trial run_trial(salmon::Backend &backend, salmon::Id model, const Fixture &fixture,
-                const std::vector<Option> &options, std::atomic_bool &cancelled) {
+                const std::vector<Option> &options, const std::vector<float> &priors,
+                std::atomic_bool &cancelled) {
     Request request;
     request.operation = salmon::Operation::Decide;
     request.model = model;
@@ -85,10 +108,14 @@ Trial run_trial(salmon::Backend &backend, salmon::Id model, const Fixture &fixtu
     const Result result = backend.execute(request, cancelled, {});
     const double milliseconds = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - start).count();
-    if (result.scores.size() != options.size()) throw std::runtime_error("Decision returned wrong score count");
-    std::vector<float> sorted = result.scores;
-    std::sort(sorted.begin(), sorted.end(), std::greater<float>());
-    return {result.choice_id, sorted.size() > 1 ? sorted[0] - sorted[1] : 1.0f, milliseconds};
+    if (result.scores.size() != options.size() || result.logits.size() != priors.size())
+        throw std::runtime_error("Decision returned wrong score count");
+    std::vector<float> adjusted;
+    for (size_t i = 0; i < result.logits.size(); ++i) adjusted.push_back(result.logits[i] - priors[i]);
+    const auto calibrated_scores = salmon::conditional_softmax(adjusted);
+    const size_t best = std::max_element(calibrated_scores.begin(), calibrated_scores.end()) - calibrated_scores.begin();
+    return {result.choice_id, options[best].id, score_margin(result.scores),
+            score_margin(calibrated_scores), milliseconds, result.logits};
 }
 } // namespace
 
@@ -112,35 +139,71 @@ int main(int argc, char **argv) {
             load.settings.threads_batch = 8;
             backend->execute(load, cancelled, {});
 
-            int correct = 0;
-            int stable = 0;
+            const auto priors = label_priors(*backend, 1, fixtures().front().options.size(), cancelled);
+            int raw_correct = 0, calibrated_correct = 0, ensemble_correct = 0;
+            int raw_stable = 0, calibrated_stable = 0;
             int trials = 0;
-            double total_ms = 0;
-            std::cout << "\nModel: " << argv[argument] << "\n";
-            std::cout << std::left << std::setw(30) << "fixture" << std::setw(18) << "expected"
-                      << std::setw(18) << "base" << std::setw(18) << "rotated"
-                      << std::setw(12) << "margin" << "ms\n";
+            double total_ms = 0, ensemble_total_ms = 0;
+            std::cout << "\nModel: " << argv[argument] << "\nLabel priors:";
+            for (float prior : priors) std::cout << ' ' << std::fixed << std::setprecision(3) << prior;
+            std::cout << "\n" << std::left << std::setw(28) << "fixture" << std::setw(15) << "expected"
+                      << std::setw(27) << "raw base/rotated" << std::setw(31) << "calibrated base/rotated"
+                      << std::setw(18) << "4-way ensemble" << "ensemble ms\n";
             for (const auto &fixture : fixtures()) {
-                const Trial base = run_trial(*backend, 1, fixture, fixture.options, cancelled);
+                const Trial base = run_trial(*backend, 1, fixture, fixture.options, priors, cancelled);
                 auto rotated = fixture.options;
                 std::rotate(rotated.begin(), rotated.begin() + 1, rotated.end());
-                const Trial reordered = run_trial(*backend, 1, fixture, rotated, cancelled);
-                correct += base.selected == fixture.expected;
-                correct += reordered.selected == fixture.expected;
-                stable += base.selected == reordered.selected;
+                const Trial reordered = run_trial(*backend, 1, fixture, rotated, priors, cancelled);
+                std::vector<std::vector<Option>> orders = {fixture.options, rotated};
+                std::vector<Trial> permutation_trials = {base, reordered};
+                for (size_t offset = 2; offset < fixture.options.size(); ++offset) {
+                    auto order = fixture.options;
+                    std::rotate(order.begin(), order.begin() + offset, order.end());
+                    orders.push_back(order);
+                    permutation_trials.push_back(run_trial(*backend, 1, fixture, order, priors, cancelled));
+                }
+                std::unordered_map<std::string, double> logit_sums;
+                double fixture_ensemble_ms = 0;
+                for (size_t permutation = 0; permutation < permutation_trials.size(); ++permutation) {
+                    fixture_ensemble_ms += permutation_trials[permutation].milliseconds;
+                    for (size_t position = 0; position < orders[permutation].size(); ++position)
+                        logit_sums[orders[permutation][position].id] += permutation_trials[permutation].raw_logits[position];
+                }
+                const auto ensemble_best = std::max_element(logit_sums.begin(), logit_sums.end(),
+                    [](const auto &left, const auto &right) { return left.second < right.second; });
+                const std::string ensemble_selected = ensemble_best->first;
+                ensemble_correct += ensemble_selected == fixture.expected;
+                ensemble_total_ms += fixture_ensemble_ms;
+                raw_correct += base.raw_selected == fixture.expected;
+                raw_correct += reordered.raw_selected == fixture.expected;
+                calibrated_correct += base.calibrated_selected == fixture.expected;
+                calibrated_correct += reordered.calibrated_selected == fixture.expected;
+                raw_stable += base.raw_selected == reordered.raw_selected;
+                calibrated_stable += base.calibrated_selected == reordered.calibrated_selected;
                 trials += 2;
                 total_ms += base.milliseconds + reordered.milliseconds;
-                std::cout << std::left << std::setw(30) << fixture.name << std::setw(18) << fixture.expected
-                          << std::setw(18) << base.selected << std::setw(18) << reordered.selected
-                          << std::setw(12) << std::fixed << std::setprecision(3) << std::min(base.margin, reordered.margin)
-                          << std::setprecision(1) << base.milliseconds + reordered.milliseconds << '\n';
+                const std::string raw_pair = base.raw_selected + " / " + reordered.raw_selected;
+                const std::string calibrated_pair = base.calibrated_selected + " / " + reordered.calibrated_selected;
+                std::cout << std::left << std::setw(28) << fixture.name << std::setw(15) << fixture.expected
+                          << std::setw(27) << raw_pair << std::setw(31) << calibrated_pair
+                          << std::setw(18) << ensemble_selected << std::fixed << std::setprecision(1)
+                          << fixture_ensemble_ms << '\n';
             }
             const int fixture_count = static_cast<int>(fixtures().size());
-            std::cout << "Accuracy: " << correct << '/' << trials << " (" << std::setprecision(1)
-                      << 100.0 * correct / trials << "%)\n"
-                      << "Order stability: " << stable << '/' << fixture_count << " ("
-                      << 100.0 * stable / fixture_count << "%)\n"
-                      << "Mean latency: " << total_ms / trials << " ms/trial\n"
+            auto percent = [](int value, int count) { return 100.0 * value / count; };
+            std::cout << "Raw accuracy: " << raw_correct << '/' << trials << " (" << std::setprecision(1)
+                      << percent(raw_correct, trials) << "%)\n"
+                      << "Raw order stability: " << raw_stable << '/' << fixture_count << " ("
+                      << percent(raw_stable, fixture_count) << "%)\n"
+                      << "Calibrated accuracy: " << calibrated_correct << '/' << trials << " ("
+                      << percent(calibrated_correct, trials) << "%)\n"
+                      << "Calibrated order stability: " << calibrated_stable << '/' << fixture_count << " ("
+                      << percent(calibrated_stable, fixture_count) << "%)\n"
+                      << "Four-position ensemble accuracy: " << ensemble_correct << '/' << fixture_count << " ("
+                      << percent(ensemble_correct, fixture_count) << "%)\n"
+                      << "Mean decision latency: " << total_ms / trials << " ms/trial"
+                      << " (one additional calibration pass per model)\n"
+                      << "Mean four-position ensemble latency: " << ensemble_total_ms / fixture_count << " ms/fixture\n"
                       << "Quality report only: no pass threshold is asserted.\n";
         }
         return 0;

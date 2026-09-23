@@ -35,7 +35,7 @@ Initial native-tuned comparison on the same fixtures:
 
 Q8_0 SHA-256: `e150ed544dfe6016930c026a93913a5e3184181ebfe6ab2223ae01dd0491784c`.
 
-Q8 improves this tiny fixture set with only a modest CPU latency increase, but neither result is sufficiently order-stable. Treat this model/strategy as experimental until label-position bias is resolved and a larger representative fixture suite passes.
+Q8 improves this tiny fixture set with only a modest CPU latency increase, but neither raw result is sufficiently order-stable. A neutral label-prior subtraction was not robust across quantizations and is not used by the runtime. Four-position cyclic ensembling removed position dependence and reached 7/8 fixtures for both models, but increased a four-option decision to roughly 2.60 seconds (Q4) or 2.95 seconds (Q8) and still missed the threat fixture. Treat this model/strategy as experimental until a larger representative suite passes.
 
 ## Embeddings
 

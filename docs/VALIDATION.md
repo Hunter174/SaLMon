@@ -16,6 +16,8 @@ Windows x86_64, MinGW GCC 13.1 and MSVC 19.44, CMake, portable/native CPU builds
   - Qwen3-0.6B Q4_K_M: 13/16 expected choices (81.2%), 5/8 option-order stability (62.5%), 761 ms mean per trial.
   - Qwen3-0.6B Q8_0: 14/16 expected choices (87.5%), 6/8 option-order stability (75.0%), 809 ms mean per trial.
   - Q8 improved this small set at modest CPU cost, but both quantizations show material option-position bias and are **not yet certified for gameplay decisions**.
+  - A single neutral label-prior calibration was rejected: it improved Q4 to 87.5%/75% but degraded Q8 to 62.5%/50%, showing the bias is not a stable model-independent constant.
+  - Averaging logits across all four cyclic option positions produced 7/8 fixture accuracy for both quantizations and removes position dependence by construction, but cost about 2.60 s (Q4) or 2.95 s (Q8) per four-option decision. It still chose the wrong reaction for the threat fixture.
 - Interactive `tests/godot/main.tscn` assembled with separate chat, semantic, and embeddings scenes; headless run with Qwen3 + MiniLM passes. Qwen weights remain ignored and are documented in `tests/models/README.md`.
 - Real-model native smoke: local all-MiniLM-L6-v2-Q4_K_M GGUF — 384-dimensional normalized, repeatable embeddings.
 - Headless Godot script: registration, errors, real chat/decision/embedding calls, stream/final equality, unload errors, queued-load destruction, compatibility class registration.
