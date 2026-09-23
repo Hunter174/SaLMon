@@ -5,11 +5,13 @@ on:
     paths:
       - 'tools/salmon-model/**'
       - '.github/workflows/companion.yml'
+      - '.gitattributes'
   push:
     branches: [main, master]
     paths:
       - 'tools/salmon-model/**'
       - '.github/workflows/companion.yml'
+      - '.gitattributes'
   workflow_dispatch:
 
 permissions:
