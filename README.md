@@ -143,7 +143,7 @@ The node must be in a processing scene tree to drain results. During pause, sign
 
 See [deployment](docs/DEPLOYMENT.md), [migration](docs/MIGRATION.md), [local GGUF benchmarking](docs/BENCHMARKING.md), the separate [model companion architecture](docs/MODEL_COMPANION.md), and the [implementation backlog](docs/ROADMAP.md).
 
-Bundled, pre-downloaded, and user-supplied local files work. A verified opt-in model download manager is planned, not implemented. Never embed multi-GB weights in the native library.
+Bundled, pre-downloaded, and user-supplied local files work. The optional standalone `salmon-model` companion provides consented, hash-verified GGUF installation and pinned `llama-quantize` toolchain management without adding networking or preparation tooling to the GDExtension. Quantization execution and source conversion remain staged follow-up work. Never embed multi-GB weights in the native library.
 
 ## Tests
 

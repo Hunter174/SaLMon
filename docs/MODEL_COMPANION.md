@@ -69,7 +69,9 @@ Discovery listings—including live inventories from recommended sources—are n
 - Models explicitly installed by the user.
 - Models explicitly converted or quantized by the user.
 - Minimal provenance and validation records required to list, select, verify, and remove those files.
-- Optional pinned conversion toolchains installed with explicit consent.
+- Optional pinned preparation toolchains installed with explicit consent.
+
+The first preparation toolchain is stored under `toolchains/llama-quantize/b6002/<os>-<arch>/`, with its separate registry under `toolchains/registry/`. Temporary archives use the existing `downloads/` directory and are removed on success, cancellation, or failure.
 
 ## User interfaces
 
@@ -100,6 +102,17 @@ salmon-model remove --id INSTALLATION_ID
 
 The digest binds the resolved commit, exact repository file, reported size, content SHA-256, license, and destination. Installation refuses files without a Hub-reported SHA-256, applies a configurable size limit, streams to a same-store temporary file, verifies size/hash and the GGUF header, then atomically promotes it. Structural validation is not represented as successful llama.cpp runtime validation.
 
+Optional quantizer-toolchain acquisition has its own consent boundary:
+
+```text
+salmon-model toolchain-plan [--root PATH]
+salmon-model toolchain-install --consent DIGEST [--root PATH]
+salmon-model toolchain-list [--root PATH]
+salmon-model toolchain-remove --id TOOLCHAIN_ID [--root PATH]
+```
+
+The catalog pins official llama.cpp `b6002` archives by platform, exact byte size, SHA-256, and GitHub release URL. Installation accepts only catalog-matching plans, HTTPS downloads and redirects, bounded ZIPs without traversal/symlink/special entries, and a successful `llama-quantize` help probe. Extraction is staged and atomically promoted. Installing the executable does not authorize running it; quantization will use a separate exact execution plan and consent digest.
+
 ## Project manifest
 
 The UI can assign an explicitly installed model to a project-level `salmon.models.json`. The manifest records purposes (`chat`, `decision`, or `embedding`), installation ID, SHA-256, repository, immutable revision, source filename, export-relative destination, declared license/link, base-model metadata, and source URL. It deliberately omits the machine-specific installed path.
@@ -114,10 +127,13 @@ Creating a manifest does not export or copy weights. A later build-staging comma
 - No repository code is executed.
 - No `trust_remote_code` behavior is permitted.
 - Download and preparation commands require explicit consent.
-- Installation uses temporary files, mandatory SHA-256 verification, local GGUF structural validation, and atomic promotion.
+- Model and toolchain installation use temporary files, mandatory SHA-256 verification, bounded validation, and atomic promotion.
+- Toolchain ZIP extraction rejects path traversal, backslash paths, absolute paths, symlinks, special files, excessive entry counts, and excessive expanded size.
 - The browser POC listens only on loopback, uses a random port and per-launch authorization token, checks mutation origins, and exposes no arbitrary URL-fetch endpoint.
 - Missing hashes and licenses are shown as warnings, never silently treated as trusted.
 
 ## Preparation handoff
 
-A direct GGUF candidate proceeds to the verified installation workflow from #7. A non-GGUF source can only be called an unverified conversion candidate until its architecture and required files match the pinned llama.cpp converter's support matrix. Conversion and quantization are delegated to opt-in toolchains managed by the companion, never the GDExtension.
+A direct GGUF candidate proceeds to the verified installation workflow from #7. A non-GGUF source remains preparation-only until its architecture and required files match the pinned llama.cpp converter's support matrix. Conversion and quantization are delegated to opt-in toolchains managed by the companion, never the GDExtension.
+
+The small `llama-quantize` acquisition path is now implemented independently of the future Python converter environment. It does not yet execute quantization. The next step is an exact `quantize-plan` / `quantize` contract that binds input hash, output destination, preset, executable identity, disk estimate, and cancellation behavior before process launch.

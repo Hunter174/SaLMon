@@ -14,6 +14,7 @@ import (
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/toolchain"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/webui"
 )
 
@@ -218,6 +219,79 @@ func run(ctx context.Context, arguments []string) error {
 			return err
 		}
 		return outputWithSource("list", "local-installation-registry", map[string]any{"models": records})
+	case "toolchain-plan":
+		flags := flag.NewFlagSet("toolchain-plan", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return errors.New("toolchain-plan accepts flags only")
+		}
+		plan, err := toolchain.BuildPlan(*root)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("toolchain-plan", "pinned-local-catalog", plan)
+	case "toolchain-install":
+		flags := flag.NewFlagSet("toolchain-install", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		consent := flags.String("consent", "", "digest from the exact toolchain-plan")
+		maximumBytes := flags.Int64("max-bytes", toolchain.DefaultMaximumArchive, "hard archive download size limit")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 || *consent == "" {
+			return errors.New("toolchain-install requires --consent and accepts no positional arguments")
+		}
+		plan, err := toolchain.BuildPlan(*root)
+		if err != nil {
+			return err
+		}
+		var lastReported int64
+		record, err := toolchain.Execute(ctx, plan, *consent, *root, *maximumBytes, func(completed, total int64) {
+			if completed-lastReported >= 1<<20 || completed == total {
+				_ = writeJSON(os.Stderr, map[string]any{"schema_version": 1, "event": "toolchain_download_progress", "completed_bytes": completed, "total_bytes": total})
+				lastReported = completed
+			}
+		}, toolchain.Dependencies{})
+		if err != nil {
+			return err
+		}
+		return outputWithSource("toolchain-install", "verified-upstream-release-and-local-storage", record)
+	case "toolchain-list":
+		flags := flag.NewFlagSet("toolchain-list", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return errors.New("toolchain-list accepts flags only")
+		}
+		records, err := toolchain.List(*root)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("toolchain-list", "local-toolchain-registry", map[string]any{"toolchains": records})
+	case "toolchain-remove":
+		flags := flag.NewFlagSet("toolchain-remove", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		id := flags.String("id", "", "installed toolchain ID from toolchain-list")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 || *id == "" {
+			return errors.New("toolchain-remove requires --id and accepts no positional arguments")
+		}
+		record, err := toolchain.Remove(*root, *id)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("toolchain-remove", "local-toolchain-registry", map[string]any{"removed": record})
 	case "version", "--version", "-version":
 		return outputWithSource("version", "local", map[string]any{"version": version})
 	default:
@@ -278,5 +352,9 @@ func usageError() error {
   salmon-model install --file FILE --consent DIGEST [--revision main] [--root PATH] OWNER/REPOSITORY
   salmon-model list [--root PATH]
   salmon-model remove --id INSTALLATION_ID [--root PATH]
+  salmon-model toolchain-plan [--root PATH]
+  salmon-model toolchain-install --consent DIGEST [--root PATH]
+  salmon-model toolchain-list [--root PATH]
+  salmon-model toolchain-remove --id TOOLCHAIN_ID [--root PATH]
   salmon-model version`))
 }
