@@ -26,7 +26,16 @@ After building tests, run the model-optional fixture report with:
 build/native/salmon_semantic_benchmark tests/models/Qwen3-0.6B-Q4_K_M.gguf
 ```
 
-The initial Q4_K_M result was 81.2% across base/rotated trials but only 62.5% option-order stability. Treat this model/strategy as experimental until label-position bias is resolved and representative game fixtures pass.
+Initial native-tuned comparison on the same fixtures:
+
+| Quantization | Size | Accuracy | Option-order stability | Mean latency |
+| --- | ---: | ---: | ---: | ---: |
+| Q4_K_M | ~397 MB | 81.2% | 62.5% | 761 ms |
+| Q8_0 | ~639 MB | 87.5% | 75.0% | 809 ms |
+
+Q8_0 SHA-256: `e150ed544dfe6016930c026a93913a5e3184181ebfe6ab2223ae01dd0491784c`.
+
+Q8 improves this tiny fixture set with only a modest CPU latency increase, but neither result is sufficiently order-stable. Treat this model/strategy as experimental until label-position bias is resolved and a larger representative fixture suite passes.
 
 ## Embeddings
 
