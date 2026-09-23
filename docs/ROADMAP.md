@@ -51,8 +51,8 @@ Implement items 1–5 and configurable CPU/GPU build foundations first. Keep dow
 
 ## Issue re-evaluation
 
-- Completed on `main`: hygiene/runtime separation (#1), runtime lifecycle (#2), chat consolidation (#3), and the interactive project (#12).
-- Core implemented but acceptance validation remains: semantic quality fixtures (#4) and embedding reference agreement (#5).
+- Completed on `main`: hygiene/runtime separation (#1), runtime lifecycle (#2), chat consolidation (#3), embedding correctness/reference agreement (#5), and the interactive project (#12).
+- Core implemented but acceptance validation remains: semantic quality and option-order robustness (#4).
 - Partial: CPU performance (#6), GPU foundations (#8), and release engineering (#9).
 - Backlog: verified model delivery (#7), ONNX evaluation (#10), and agent/NPC extensions (#13–#16).
 - Blocked: clean Windows Godot import (#11).
@@ -61,7 +61,7 @@ Implement items 1–5 and configurable CPU/GPU build foundations first. Keep dow
 
 ## Current progress
 
-- Committed hygiene/runtime/chat plus the initial decision and embedding paths in `2b9eb98`, with native and real-model smoke tests. Issues #1–#3 are complete; model-quality/reference validation keeps #4–#5 open.
+- Committed hygiene/runtime/chat plus the initial decision and embedding paths in `2b9eb98`, with native and real-model smoke tests. Issues #1–#3 are complete; semantic quality keeps #4 open, while canonical MiniLM cosine-reference validation completed #5.
 - Added CPU configuration, separate generation/batch thread controls, Qwen3 no-thinking support, optional native/AVX2 builds, and example-level embedding index caching. Reproducible p50/p95 benchmarks, runtime prefix reuse, true cross-text batching, device discovery, and GPU fallback remain (#6/#8).
 - Added deployment/migration documentation, source-built desktop CI preview artifacts, and an interactive three-domain Godot showcase (#12). No built-in downloader or production certification yet (#7/#9).
 - Preserved the pre-existing modified tracked DLL and uncompiled embedding prototype outside the commit; ordinary development output is isolated under the build directory, with an explicit opt-in target for staging the Godot demo.
