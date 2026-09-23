@@ -14,7 +14,7 @@ Recommended options:
 
 1. Distribute models alongside the exported game (or in a developer-chosen application-data directory) and pass an absolute path.
 2. Copy a bundled resource from the PCK to `user://models/` using Godot file APIs before loading. This needs extra disk space and should not block rendering for large files.
-3. Download a model with a developer-owned, consented, verified delivery process into `user://models/`. The built-in manager is tracked in issue #7, not yet implemented.
+3. Download a model with a developer-owned, consented, verified delivery process into `user://models/`. The separate `salmon-model` companion is the planned #7/#17 delivery path; networking will not be linked into the GDExtension.
 4. Let players select a compatible local GGUF. Explain model/hardware/license requirements.
 
 Example external desktop path:
@@ -26,9 +26,11 @@ var handle = ai.load_model(model_path, "chat")
 
 Use a different development path in the editor: the editor executable directory is not the project directory. macOS app bundles/sandboxing also need platform-specific resource locations; do not assume the desktop example is universal.
 
-## Model manifest requirements (future manager)
+## Model companion and installation records
 
-Pin model identity/revision, architecture, intended purpose, tokenizer/template, file size, SHA-256, source URL, license and attribution. Verify hashes before activation; use temporary downloads and atomic promotion. Support cancellation and corrupt-cache detection. Do not silently download weights on startup. Model weights are not bundled into runtime CI artifacts.
+The optional `salmon-model` companion queries Hugging Face live without persisting a catalog and is distributed separately from the Godot Asset Library addon. Only explicitly installed/prepared models and their minimal provenance are stored. See [the companion architecture](MODEL_COMPANION.md).
+
+Pin installed model identity/revision, architecture, intended purpose, tokenizer/template, file size, SHA-256, source URL, license and attribution. Verify hashes before activation; use temporary downloads and atomic promotion. Support cancellation and corrupt-cache detection. Do not silently download weights on startup. Model weights are not bundled into runtime CI artifacts.
 
 ## Gameplay design
 
