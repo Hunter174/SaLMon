@@ -106,4 +106,8 @@ if(BUILD_TESTING)
     set_tests_properties(salmon_runtime PROPERTIES TIMEOUT 30)
     add_executable(salmon_model_smoke tests/model_smoke.cpp)
     target_link_libraries(salmon_model_smoke PRIVATE salmon_runtime)
+    # Model weights are external, so this quality reporter is built but not
+    # registered with CTest. Run it explicitly against candidate GGUF files.
+    add_executable(salmon_semantic_benchmark tests/semantic_benchmark.cpp)
+    target_link_libraries(salmon_semantic_benchmark PRIVATE salmon_runtime)
 endif()

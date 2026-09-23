@@ -12,6 +12,7 @@ Windows x86_64, MinGW GCC 13.1, CMake, portable CPU build, Godot 4.5.1 stable of
 - Native CTest suite: conditional softmax and invalid inputs; option validation; UTF-8 chunk boundaries; FIFO delivery; stream preservation; worker exceptions; active/queued cancellation; backpressure; outstanding request retirement; active-worker destruction; invalid model files and handles.
 - Real-model native smoke: local SmolLM2-135M-Instruct GGUF — chat, stream equality, repeated-request context isolation, decision-score shape/normalization.
 - Real-model native smoke: local Qwen3-0.6B Q4_K_M GGUF — chat, stream equality, repeated-request context isolation, and decision-score shape/normalization.
+- Initial semantic fixture report (`salmon_semantic_benchmark`) on the native-tuned i7-10750H build: 13/16 expected choices (81.2%), but only 5/8 choices stable after rotating option order (62.5%); mean 796.5 ms per decision trial. The three changed outcomes reveal material option-position bias, so Qwen3-0.6B Q4_K_M is **not yet certified for gameplay decisions**.
 - Interactive `tests/godot/main.tscn` assembled with separate chat, semantic, and embeddings scenes; headless run with Qwen3 + MiniLM passes. Qwen weights remain ignored and are documented in `tests/models/README.md`.
 - Real-model native smoke: local all-MiniLM-L6-v2-Q4_K_M GGUF — 384-dimensional normalized, repeatable embeddings.
 - Headless Godot script: registration, errors, real chat/decision/embedding calls, stream/final equality, unload errors, queued-load destruction, compatibility class registration.
@@ -34,6 +35,14 @@ cmake -S . -B build/dev -DCMAKE_BUILD_TYPE=Release -DGODOTCPP_TARGET=template_de
 cmake --build build/dev --config Release --parallel 4
 ctest --test-dir build/dev -C Release --output-on-failure
 ```
+
+Run the optional game-decision quality report against one or more local candidate models:
+
+```sh
+build/dev/salmon_semantic_benchmark path/to/model.gguf [path/to/second-model.gguf]
+```
+
+This reports accuracy, margin, latency, and option-order stability without imposing a universal pass threshold.
 
 For Godot, copy `tests/godot/project.godot` and `tests/godot/smoke.gd` into a temporary project and copy the **freshly built** `build/dev/addon/addons/` directory into it. With multi-config generators, move the generated DLL from the `bin/Release/` subdirectory to `bin/` first.
 

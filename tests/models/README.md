@@ -20,6 +20,14 @@ huggingface-cli download unsloth/Qwen3-0.6B-GGUF \
 
 Qwen3 is used for both chat and experimental semantic decisions. Semantic scoring is direct next-token logit scoring, not a separate classifier. The sample project validates the mechanism and displays scores; it does not certify decision accuracy or calibration.
 
+After building tests, run the model-optional fixture report with:
+
+```sh
+build/native/salmon_semantic_benchmark tests/models/Qwen3-0.6B-Q4_K_M.gguf
+```
+
+The initial Q4_K_M result was 81.2% across base/rotated trials but only 62.5% option-order stability. Treat this model/strategy as experimental until label-position bias is resolved and representative game fixtures pass.
+
 ## Embeddings
 
 The repository currently contains the small sample embedding model at:
