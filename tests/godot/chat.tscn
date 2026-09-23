@@ -1,0 +1,68 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://chat.gd" type="Script" id="1"]
+
+[node name="Chat" type="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+script = ExtResource("1")
+
+[node name="Header" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Campfire Companion"
+
+[node name="Timing" type="Label" parent="Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.7, 0.78, 1)
+
+[node name="Reset" type="Button" parent="Header"]
+layout_mode = 2
+text = "Reset conversation"
+
+[node name="Pitch" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 2
+text = "Generated dialogue shines when the player can say what authored dialogue trees cannot anticipate. Mara has a fixed persona, compact local context, and a bounded conversation memory."
+
+[node name="Transcript" type="RichTextLabel" parent="."]
+custom_minimum_size = Vector2(0, 310)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_active = true
+
+[node name="Suggestions" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Suggestions"]
+layout_mode = 2
+text = "Try:"
+
+[node name="AskPass" type="Button" parent="Suggestions"]
+layout_mode = 2
+text = "Ask about the pass"
+
+[node name="AskMemory" type="Button" parent="Suggestions"]
+layout_mode = 2
+text = "Recall Greyford"
+
+[node name="AskMine" type="Button" parent="Suggestions"]
+layout_mode = 2
+text = "Investigate the mine"
+
+[node name="Compose" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Input" type="LineEdit" parent="Compose"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Say anything to Mara..."
+
+[node name="Send" type="Button" parent="Compose"]
+layout_mode = 2
+text = "Speak"

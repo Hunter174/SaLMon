@@ -1,0 +1,68 @@
+# SaLMoN implementation roadmap
+
+Local inference only: chat generation, semantic decisions, and embeddings. Model delivery (bundled/downloaded/user supplied) is separate from inference. GGUF weights stay outside the native library and must be real filesystem files, not PCK-only resources.
+
+## Ordered work items
+
+1. **Hygiene**: portable out-of-tree CMake, build dependencies from source, isolate native runtime from Godot, remove unsafe shell downloads and misleading release packaging, document migration.
+2. **Lifecycle**: RAII model handles, owned worker, bounded queue, request IDs, cancellation, safe shutdown/reload, main-thread signals and structured errors.
+3. **Chat**: one generation implementation, correctly sized templates/tokens, context limits, UTF-8 streaming, fresh state per request.
+4. **Decisions**: experimental direct single-token label scoring, validated options, stable softmax, metadata and latency; no confidence/correctness guarantees.
+5. **Embeddings**: persistent dedicated encoder handles, correct encoder/pooling path, normalization, multiple texts per request; cross-text batching later.
+6. **CPU performance**: reproducible benchmarks, thread/batch/context/mmap controls; cache reuse only after correctness tests.
+7. **Model delivery**: opt-in HTTPS downloads, pinned manifest/checksum/license, temporary files + atomic promotion, cancellation, size limits, export examples. No inference networking.
+8. **GPU**: optional Vulkan/CUDA/Metal builds, device discovery, explicit selection and tested fallback. Never assume the rendering GPU has spare memory.
+9. **Release validation**: platform matrix, headless Godot lifecycle/export tests, packaged dependencies/notices, checksums, no weights in runtime release.
+10. **ONNX evaluation**: benchmark embeddings against llama.cpp before adding a second runtime.
+
+## Constraints
+
+- Preserve existing local edits and binaries; do not publish releases automatically.
+- CPU is the default. Avoid host-specific instruction tuning in redistributable builds.
+- Async does not mean real-time: measure tail latency and frame-time impact.
+- Direct logits require token labels validated for the exact prompt boundary/tokenizer. Arbitrary multi-token option descriptions are not scored as single tokens.
+- Separate questions require separate suffix evaluation; shared prefixes are not free batching.
+- Type-safe output does not imply a semantically correct choice. Scores are conditional on supplied options and uncalibrated.
+- Model architecture, GGUF compatibility, pooling and licenses must be validated per model.
+- Do not claim current support for newer models merely because upstream llama.cpp supports them; the submodule is pinned.
+
+## Initial implementation boundary
+
+Implement items 1–5 and configurable CPU/GPU build foundations first. Keep downloads, caching/batching optimization, device auto-selection, GPU benchmarks, production release validation and ONNX as explicit follow-ups. The public API proposed in conversation was illustrative, not an existing compatibility contract.
+
+## GitHub backlog
+
+- [Hygiene: portable builds and runtime separation](https://github.com/Hunter174/SaLMon/issues/1)
+- [Runtime: owned worker, model handles and cancellation](https://github.com/Hunter174/SaLMon/issues/2)
+- [Chat: consolidate generation and validate prompt boundaries](https://github.com/Hunter174/SaLMon/issues/3)
+- [Semantic decisions: native direct-logit scoring](https://github.com/Hunter174/SaLMon/issues/4)
+- [Embeddings: persistent encoder models and correct pooling](https://github.com/Hunter174/SaLMon/issues/5)
+- [CPU performance: benchmarks, batching and prefix reuse](https://github.com/Hunter174/SaLMon/issues/6)
+- [Models: bundled exports and opt-in verified download cache](https://github.com/Hunter174/SaLMon/issues/7)
+- [GPU: Vulkan, CUDA and Metal support with tested fallback](https://github.com/Hunter174/SaLMon/issues/8)
+- [Release engineering: platform builds and Godot integration tests](https://github.com/Hunter174/SaLMon/issues/9)
+- [Evaluate ONNX for embeddings only](https://github.com/Hunter174/SaLMon/issues/10)
+- [Windows first-import release blocker](https://github.com/Hunter174/SaLMon/issues/11)
+- [Interactive three-domain Godot project](https://github.com/Hunter174/SaLMon/issues/12)
+- [Hybrid natural-language NPC reference](https://github.com/Hunter174/SaLMon/issues/13)
+- [Grammar-constrained game tool calls](https://github.com/Hunter174/SaLMon/issues/14)
+- [Bounded local agent/tool loop](https://github.com/Hunter174/SaLMon/issues/15)
+- [Scoped persistent NPC memory](https://github.com/Hunter174/SaLMon/issues/16)
+
+## Issue re-evaluation
+
+- Review-ready after commit: runtime lifecycle (#2) and chat consolidation (#3).
+- Core implemented but acceptance validation remains: hygiene (#1), semantic quality fixtures (#4), embedding reference agreement (#5), and the interactive project (#12).
+- Partial: CPU performance (#6), GPU foundations (#8), and release engineering (#9).
+- Backlog: verified model delivery (#7), ONNX evaluation (#10), and agent/NPC extensions (#13–#16).
+- Blocked: clean Windows Godot import (#11).
+
+Do not close implementation issues until the working tree is committed and clean-checkout CI confirms the corresponding code. “Mechanically implemented” is not equivalent to model-quality or release certification.
+
+## Working-tree progress
+
+- Implemented initial hygiene/runtime/chat/decision/embedding paths (#1–#5), with native and real-model smoke tests. Not yet committed or released.
+- Added CPU configuration, separate generation/batch thread controls, Qwen3 no-thinking support, optional native/AVX2 builds, and example-level embedding index caching. Reproducible p50/p95 benchmarks, runtime prefix reuse, true cross-text batching, device discovery, and GPU fallback remain (#6/#8).
+- Added deployment/migration documentation, source-built desktop CI preview artifacts, and an interactive three-domain Godot showcase (#12). No built-in downloader or production certification yet (#7/#9).
+- Preserved the existing modified tracked DLL and uncompiled embedding prototype; development output is isolated under the build directory.
+- See `VALIDATION.md` for tested hardware/models, limitations and the first-import blocker. Issues remain open until their acceptance criteria are met and changes are reviewed.

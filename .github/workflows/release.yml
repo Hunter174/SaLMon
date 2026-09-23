@@ -1,40 +1,64 @@
-name: Release Salmon Addon
+name: Build and Test SaLMoN
 
+# Build from source. Never publish historical tracked binaries as a new release.
 on:
+  pull_request:
   push:
-    tags:
-      - 'v*'
+    branches: [main, master]
+    tags: ['v*']
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build-and-release:
-    runs-on: ubuntu-latest
-
+  desktop-cpu:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        godot_target: [template_debug, template_release]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Prepare addons folder
-        run: |
-          mkdir -p addons/salmon/bin
-          # Copy binaries if they exist
-          cp salmon/bin/*.dll addons/salmon/bin/ 2>/dev/null || true
-          cp salmon/bin/*.a addons/salmon/bin/ 2>/dev/null || true
-          # Copy required extension and scripts
-          cp salmon/salmon.gdextension addons/salmon/ 2>/dev/null || true
-          cp salmon/model_download.bat addons/salmon/ 2>/dev/null || true
-          cp salmon/model_download.sh addons/salmon/ 2>/dev/null || true
-          # Copy license & readme to the addon root
-          cp LICENSE addons/salmon/ 2>/dev/null || true
-          cp README.md addons/salmon/ 2>/dev/null || true
-
-      - name: Zip into correct structure
-        run: |
-          zip -r salmon-addon.zip addons LICENSE README.md
-
-      - name: Upload to GitHub Releases
-        uses: softprops/action-gh-release@v1
+      - uses: actions/checkout@v4
         with:
-          files: salmon-addon.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Configure portable CPU runtime
+        run: cmake -S . -B build/ci -DCMAKE_BUILD_TYPE=Release -DGODOTCPP_TARGET=${{ matrix.godot_target }} -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build build/ci --config Release --parallel 4
+      - name: Native tests (no model downloads)
+        run: ctest --test-dir build/ci -C Release --output-on-failure
+      - name: Stage runtime notices and flatten multi-config output
+        shell: python
+        run: |
+          from pathlib import Path
+          import shutil
+          root = Path('build/ci/addon')
+          binary_dir = root / 'addons/salmon/bin'
+          for config in ('Release', 'Debug', 'RelWithDebInfo', 'MinSizeRel'):
+              nested = binary_dir / config
+              if nested.exists():
+                  for file in nested.iterdir():
+                      if file.suffix in ('.dll', '.so', '.dylib'):
+                          shutil.copy2(file, binary_dir / file.name)
+                  shutil.rmtree(nested)
+          notices = root / 'notices'
+          notices.mkdir(parents=True, exist_ok=True)
+          for source, name in [('LICENSE', 'SaLMoN.txt'), ('lib/llama.cpp/LICENSE', 'llama.cpp.txt'), ('lib/godot-cpp/LICENSE.md', 'godot-cpp.txt')]:
+              shutil.copy2(source, notices / name)
+          shutil.copy2('README.md', root / 'README.md')
+          shutil.copytree('docs', root / 'docs', dirs_exist_ok=True)
+          assert list(binary_dir.glob('*.*')), 'No generated extension artifact'
+          assert not list(root.rglob('*.gguf')), 'Runtime must not include model weights'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: salmon-cpu-${{ matrix.os }}-${{ matrix.godot_target }}-preview
+          path: build/ci/addon/
+          if-no-files-found: error
+
+# These are unverified preview artifacts, not published releases. Headless Godot,
+# export, dependency and GPU checks are tracked in #9; fresh Windows import in #11.

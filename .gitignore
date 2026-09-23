@@ -22,15 +22,21 @@
 *.make
 *.dblite
 *.gguf
-*.cmake
-*.obj
-*.ts
+*.dll
+*.a
 
 
 # === Build artifacts ===
 /build/
 build
 src/models
+/CMakeFiles/
+/CMakeCache.txt
+/Makefile
+/cmake_install.cmake
+/CTestTestfile.cmake
+/Testing/
+compile_commands.json
 
 # === Godot C++ Bindings ===
 /lib/godot-cpp/bin/
@@ -54,6 +60,7 @@ src/models
 
 # === Godot metadata (optional if included elsewhere) ===
 .export/
-
+.models/
+.godot/
 # === Other Folders ===
 

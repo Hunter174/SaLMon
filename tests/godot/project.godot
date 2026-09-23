@@ -1,0 +1,31 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="SaLMoN Three Domains"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.5")
+
+[display]
+
+window/size/viewport_width=1100
+window/size/viewport_height=700
+window/size/window_width_override=1100
+window/size/window_height_override=700
+
+[environment]
+
+SALMON_CHAT_MODEL=""
+SALMON_EMBEDDING_MODEL=""
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"

@@ -1,0 +1,93 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource path="res://main.gd" type="Script" id="1_main"]
+[ext_resource path="res://chat.tscn" type="PackedScene" id="2_chat"]
+[ext_resource path="res://semantic.tscn" type="PackedScene" id="3_semantic"]
+[ext_resource path="res://embeddings.tscn" type="PackedScene" id="4_embeddings"]
+
+[node name="ThreeDomains" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Salmon" type="Salmon" parent="."]
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Column" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Margin/Column"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "SaLMoN — three ways local models earn their place"
+
+[node name="Status" type="Label" parent="Margin/Column"]
+layout_mode = 2
+text = "Loading local models… Chat generates · Semantic constrains · Embeddings retrieve"
+
+[node name="Models" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+
+[node name="ChatPath" type="Label" parent="Margin/Column/Models"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Chat/semantic: not loaded"
+text_overrun_behavior = 3
+
+[node name="PickChat" type="Button" parent="Margin/Column/Models"]
+layout_mode = 2
+text = "Choose chat model…"
+
+[node name="EmbeddingPath" type="Label" parent="Margin/Column/Models"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Embeddings: not loaded"
+text_overrun_behavior = 3
+
+[node name="PickEmbedding" type="Button" parent="Margin/Column/Models"]
+layout_mode = 2
+text = "Choose embedding model…"
+
+[node name="Tabs" type="TabContainer" parent="Margin/Column"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Chat" parent="Margin/Column/Tabs" instance=ExtResource("2_chat")]
+layout_mode = 2
+
+[node name="Semantic" parent="Margin/Column/Tabs" instance=ExtResource("3_semantic")]
+layout_mode = 2
+
+[node name="Embeddings" parent="Margin/Column/Tabs" instance=ExtResource("4_embeddings")]
+layout_mode = 2
+
+[node name="ChatModelDialog" type="FileDialog" parent="."]
+title = "Choose a chat/semantic GGUF model"
+size = Vector2i(900, 600)
+ok_button_text = "Load model"
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.gguf ; GGUF models")
+
+[node name="EmbeddingModelDialog" type="FileDialog" parent="."]
+title = "Choose an embedding GGUF model"
+size = Vector2i(900, 600)
+ok_button_text = "Load model"
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.gguf ; GGUF models")

@@ -1,0 +1,62 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://semantic.gd" type="Script" id="1"]
+
+[node name="Semantic" type="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+script = ExtResource("1")
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Living Blacksmith — constrained semantic policy"
+
+[node name="Pitch" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 2
+text = "Say anything to Hesta. One model forward pass maps unstructured speech plus NPC state onto authored, legal reactions—no prose is generated. Game code applies consequences and rejects uncertain choices."
+
+[node name="State" type="Label" parent="."]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.78, 0.42, 1)
+text = "NPC STATE"
+
+[node name="Presets" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Presets"]
+layout_mode = 2
+text = "Try contrasting phrasing:"
+
+[node name="Threat" type="Button" parent="Presets"]
+layout_mode = 2
+text = "Threaten"
+
+[node name="Polite" type="Button" parent="Presets"]
+layout_mode = 2
+text = "Ask politely"
+
+[node name="Favor" type="Button" parent="Presets"]
+layout_mode = 2
+text = "Invoke a real favor"
+
+[node name="SpeechRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Speech" type="LineEdit" parent="SpeechRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "What do you say to the blacksmith?"
+text = "Remember when I saved your ore caravan? You owe me a fair price."
+
+[node name="Judge" type="Button" parent="SpeechRow"]
+layout_mode = 2
+text = "Respond"
+
+[node name="Result" type="RichTextLabel" parent="."]
+custom_minimum_size = Vector2(0, 285)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "The model chooses intent; deterministic code remains authoritative. Try paraphrasing the examples rather than using their exact words."

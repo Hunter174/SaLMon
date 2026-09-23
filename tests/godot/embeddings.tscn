@@ -1,0 +1,58 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://embeddings.gd" type="Script" id="1"]
+
+[node name="Embeddings" type="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+script = ExtResource("1")
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Lore Lens — search memories by meaning"
+
+[node name="Pitch" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 2
+text = "Ask naturally across an untagged journal. MiniLM retrieves relevant authored lore even when the question and record share few exact words—ideal for memory, quest, item, and codex retrieval."
+
+[node name="Examples" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Examples"]
+layout_mode = 2
+text = "Try:"
+
+[node name="Medicine" type="Button" parent="Examples"]
+layout_mode = 2
+text = "Find a fever remedy"
+
+[node name="StolenGoods" type="Button" parent="Examples"]
+layout_mode = 2
+text = "Trace stolen cargo"
+
+[node name="StrangeLights" type="Button" parent="Examples"]
+layout_mode = 2
+text = "Investigate strange lights"
+
+[node name="QueryRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Query" type="LineEdit" parent="QueryRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Search the world's memories in your own words..."
+text = "Who might be buying cargo stolen from merchants?"
+
+[node name="Search" type="Button" parent="QueryRow"]
+layout_mode = 2
+text = "Search lore"
+
+[node name="Result" type="RichTextLabel" parent="."]
+custom_minimum_size = Vector2(0, 330)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_active = true
+text = "Seven authored records are searched locally. Try paraphrasing a clue without reusing its nouns."
