@@ -16,6 +16,7 @@
       <button class="nav" data-view="hub"><span>⌕</span>Hugging Face</button>
       <button class="nav" data-view="local"><span>↓</span>Local models</button>
       <button class="nav" data-view="project"><span>◇</span>Project manifest</button>
+      <button class="nav" data-view="hardware"><span>▤</span>Target hardware</button>
     </nav>
     <div class="sidebar-note"><span class="status-dot"></span> Companion running locally</div>
     <button id="exit" class="nav exit"><span>×</span>Quit</button>
@@ -49,7 +50,14 @@
         <select id="format" aria-label="Model format"><option value="gguf">GGUF only</option><option value="any">Any format</option></select>
         <button type="submit" class="primary">Search</button>
       </form>
-      <div class="source-line"><strong>Source</strong> Hugging Face Hub API <span>·</span> Results are unverified until installed and tested.</div>
+      <div class="filter-bar">
+        <label>Purpose<select id="filter-purpose"><option value="any">Any purpose</option><option value="chat">Chat / decisions</option><option value="embedding">Embeddings</option></select></label>
+        <label>Quantization<select id="filter-quant"><option value="any">Any quantization</option><option value="Q4">Q4</option><option value="Q5">Q5</option><option value="Q6">Q6</option><option value="Q8">Q8</option></select></label>
+        <label>License metadata<select id="filter-license"><option value="any">Any</option><option value="declared">Declared</option><option value="apache-2.0">Apache-2.0</option><option value="mit">MIT</option><option value="unknown">Missing</option></select></label>
+        <label>Maximum file size<input id="filter-size" type="number" min="0.01" step="0.25" placeholder="Any"><span>GB</span></label>
+        <button id="clear-filters" type="button" class="link-button">Clear</button>
+      </div>
+      <div class="source-line"><strong>Source</strong> Hugging Face Hub API <span>·</span> Results are unverified until installed and tested. <button id="edit-target" class="link-button" type="button">Target: <span id="target-summary">not set</span></button></div>
       <div id="search-status" class="status-text" aria-live="polite"></div>
       <div id="results" class="model-list"></div>
     </section>
@@ -62,6 +70,21 @@
       <div class="storage-bar"><div><span>Storage location</span><code id="storage-root">—</code></div><strong id="storage-summary">—</strong></div>
       <div id="installed-status" class="status-text" aria-live="polite"></div>
       <div id="installed-list" class="model-list"></div>
+    </section>
+
+    <section id="hardware" class="view">
+      <header class="page-header">
+        <div><h1>Target hardware</h1><p>Estimate model fit for the computers your game is intended to support.</p></div>
+      </header>
+      <div class="callout"><strong>These are planning estimates, not benchmarks.</strong><span>SaLMon estimates weight memory from GGUF file size plus conservative runtime overhead. Context, batching, backend, and architecture can require substantially more memory.</span></div>
+      <form id="hardware-form" class="hardware-form">
+        <label><span>System RAM</span><div><input id="target-ram" type="number" min="2" max="1024" step="1" required><b>GB</b></div><small>Two GB are reserved for the OS before estimating model capacity.</small></label>
+        <label><span>GPU memory</span><div><input id="target-vram" type="number" min="0" max="1024" step="1" required><b>GB</b></div><small>Use zero for a CPU-only deployment target.</small></label>
+        <label><span>Maximum model download</span><div><input id="target-download" type="number" min="0.1" max="2048" step="0.5" required><b>GB</b></div><small>Files over this project budget are marked as exceeding it.</small></label>
+        <label><span>Deployment mode</span><select id="target-mode"><option value="cpu">CPU-first</option><option value="gpu">GPU-assisted / partial offload</option></select><small>GPU mode considers RAM and VRAM together; it does not promise full offload.</small></label>
+        <div class="hardware-actions"><button type="submit" class="primary">Apply target profile</button><span id="hardware-detected"></span></div>
+      </form>
+      <div class="fit-key"><span class="fit comfortable">Fits comfortably</span><span class="fit likely">Likely fits</span><span class="fit tight">Tight</span><span class="fit exceeds">Exceeds budget</span></div>
     </section>
 
     <section id="project" class="view">

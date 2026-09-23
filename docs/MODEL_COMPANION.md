@@ -33,6 +33,14 @@ A separate starter set is deliberately limited to exact artifacts SaLMon has exe
 
 Starter records are pinned by repository commit, filename, size, SHA-256, validation status, and review date. They are guidance, not a claim of safety or legal certification.
 
+## Target hardware and filtering
+
+The UI accepts a session-level deployment target: system RAM, optional VRAM, maximum model download size, and CPU-first or GPU-assisted mode. This is intentionally editable because the developer's workstation may not represent players' machines. The browser's coarse memory report is only an initial hint and is never silently treated as a shipping requirement.
+
+Fit labels use a conservative planning estimate of `file size × 1.25 + 0.5 GiB`, reserve 2 GiB of system RAM for the OS, and in GPU-assisted mode count 90% of declared VRAM alongside RAM. Labels mean only that weights and rough overhead may fit: context length, KV cache, architecture, batching, backend allocations, and other game memory can materially increase usage. They are not performance or compatibility certification.
+
+Unrestricted Hub results can be filtered in memory by candidate purpose, quantization, declared/missing license metadata, and maximum GGUF file size. The target profile and filters do not create or persist a model-listing cache.
+
 ## Persistence
 
 Discovery listings—including live inventories from recommended sources—are never cached by SaLMon. Persistence is limited to user-created state:

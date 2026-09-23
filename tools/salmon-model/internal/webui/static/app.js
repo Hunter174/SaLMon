@@ -18,6 +18,33 @@ const formatBytes = value => {
 };
 const formatCount = value => new Intl.NumberFormat(undefined, { notation: "compact" }).format(value || 0);
 const shortHash = value => value ? `${value.slice(0, 10)}…` : "Unavailable";
+const GiB = 1024 * 1024 * 1024;
+const detectedRAM = Number(navigator.deviceMemory || 0);
+let targetProfile = { ramGB: detectedRAM || 8, vramGB: 0, maxDownloadGB: 4, mode: "cpu" };
+let lastSearchResults = [], lastProviderResults = [], lastRecommendationData = null;
+
+function safeExternalURL(value) {
+  try { const parsed = new URL(value); return parsed.protocol === "https:" ? parsed.href : ""; }
+  catch { return ""; }
+}
+
+function fitFor(file) {
+  if (!file?.size_bytes) return { className: "unknown", label: "Fit unknown", estimatedGB: 0 };
+  const sizeGB = file.size_bytes / GiB;
+  const estimatedGB = sizeGB * 1.25 + 0.5;
+  const availableGB = Math.max(0, targetProfile.ramGB - 2) + (targetProfile.mode === "gpu" ? targetProfile.vramGB * 0.9 : 0);
+  if (sizeGB > targetProfile.maxDownloadGB || estimatedGB > availableGB) return { className: "exceeds", label: "Exceeds target", estimatedGB };
+  const ratio = availableGB ? estimatedGB / availableGB : Infinity;
+  if (ratio <= 0.65) return { className: "comfortable", label: "Fits comfortably", estimatedGB };
+  if (ratio <= 0.85) return { className: "likely", label: "Likely fits", estimatedGB };
+  return { className: "tight", label: "Tight fit", estimatedGB };
+}
+
+function fitElement(file) {
+  const fit = fitFor(file), element = make("span", `fit ${fit.className}`, fit.label);
+  element.title = fit.estimatedGB ? `Rough runtime estimate: ${fit.estimatedGB.toFixed(1)} GB before larger contexts or batching` : "File size unavailable";
+  return element;
+}
 
 async function api(path, options = {}) {
   const headers = { Accept: "application/json", ...(options.headers || {}) };
@@ -41,6 +68,7 @@ function activateView(name) {
   $(`#${name}`).classList.add("active");
   if (name === "local") loadInstalled();
   if (name === "recommended") loadRecommendations();
+  if (name === "hardware") populateHardwareForm();
 }
 
 document.querySelectorAll(".nav[data-view]").forEach(button => {
@@ -59,17 +87,52 @@ $("#search-form").addEventListener("submit", async event => {
     const query = encodeURIComponent($("#query").value);
     const format = encodeURIComponent($("#format").value);
     const data = await api(`/api/search?q=${query}&format=${format}&limit=30`);
-    status.textContent = `${data.results.length} live result${data.results.length === 1 ? "" : "s"}`;
-    if (!data.results.length) {
-      empty(target, "No matching repositories", "Try a model family, author, or exact owner/repository name.");
-      return;
-    }
-    target.replaceChildren(...data.results.map(remoteRow));
+    lastSearchResults = data.results;
+    renderFilteredResults(lastSearchResults, target, status, "live");
   } catch (error) {
     status.textContent = `Search failed: ${error.message}`;
     empty(target, "Hugging Face could not be reached", "Check your connection and try again.");
   }
 });
+
+function selectedFilters() {
+  return {
+    purpose: $("#filter-purpose").value, quant: $("#filter-quant").value,
+    license: $("#filter-license").value, maxGB: Number($("#filter-size").value || 0)
+  };
+}
+
+function matchesFilters(result) {
+  const filters = selectedFilters(), files = result.plan.gguf_files || [];
+  if (filters.purpose !== "any" && !(result.plan.candidate_purposes || []).includes(filters.purpose)) return false;
+  if (filters.license === "declared" && result.plan.license === "unknown") return false;
+  if (!["any", "declared"].includes(filters.license) && result.plan.license.toLowerCase() !== filters.license) return false;
+  if (filters.quant !== "any" && !files.some(file => (file.quantization || "").startsWith(filters.quant))) return false;
+  if (filters.maxGB && !files.some(file => file.size_bytes && file.size_bytes <= filters.maxGB * GiB)) return false;
+  return true;
+}
+
+function renderFilteredResults(results, target, status, source) {
+  const filtered = results.filter(matchesFilters);
+  status.textContent = `${filtered.length} of ${results.length} ${source} result${results.length === 1 ? "" : "s"} match the current filters`;
+  if (!filtered.length) { empty(target, "No models match these filters", "Clear a filter or increase the maximum file size."); return; }
+  target.replaceChildren(...filtered.map(remoteRow));
+}
+
+function refreshFilteredResults() {
+  if (lastSearchResults.length) renderFilteredResults(lastSearchResults, $("#results"), $("#search-status"), "live");
+  if (lastProviderResults.length) $("#provider-results").replaceChildren(...lastProviderResults.map(remoteRow));
+}
+
+["#filter-purpose", "#filter-quant", "#filter-license", "#filter-size"].forEach(selector => {
+  $(selector).addEventListener("input", refreshFilteredResults);
+});
+$("#clear-filters").addEventListener("click", () => {
+  $("#filter-purpose").value = "any"; $("#filter-quant").value = "any";
+  $("#filter-license").value = "any"; $("#filter-size").value = "";
+  refreshFilteredResults();
+});
+$("#edit-target").addEventListener("click", () => activateView("hardware"));
 
 function remoteRow(result) {
   const row = make("article", "model-row");
@@ -83,6 +146,8 @@ function remoteRow(result) {
     make("span", "", `${formatCount(result.downloads)} downloads`),
     make("span", "", `${formatCount(result.likes)} likes`)
   );
+  const fitting = (result.plan.gguf_files || []).filter(file => fitFor(file).className !== "exceeds").length;
+  metadata.append(make("span", fitting ? "validation-state" : "license-unknown", fitting ? `${fitting} file${fitting === 1 ? "" : "s"} within target` : "No files within target"));
   main.append(metadata);
   const actions = make("div", "model-actions");
   const inspectButton = make("button", "secondary", "View files");
@@ -99,12 +164,23 @@ async function loadRecommendations() {
   try {
     const data = await api("/api/recommendations");
     $("#starter-status").textContent = data.warning;
-    $("#starter-models").replaceChildren(...data.models.map(starterRow));
+    lastRecommendationData = data;
+    renderStarterModels();
     $("#provider-list").replaceChildren(...data.providers.map(providerRow));
     recommendationsLoaded = true;
   } catch (error) {
     $("#starter-status").textContent = `Could not load recommendations: ${error.message}`;
   }
+}
+
+function renderStarterModels() {
+  if (lastRecommendationData) $("#starter-models").replaceChildren(...lastRecommendationData.models.map(starterRow));
+}
+
+function suggestedFile(model) {
+  const candidates = model.files.filter(file => fitFor(file).className !== "exceeds");
+  if (!candidates.length) return null;
+  return candidates.sort((a, b) => (b.size_bytes || 0) - (a.size_bytes || 0))[0];
 }
 
 function starterRow(model) {
@@ -117,6 +193,9 @@ function starterRow(model) {
     make("span", "", model.files.map(file => file.quantization).join(" / ")),
     make("span", "", model.repository)
   );
+  const suggestion = suggestedFile(model);
+  if (suggestion) metadata.append(fitElement(suggestion), make("span", "validation-state", `Suggested: ${suggestion.quantization}`));
+  else metadata.append(make("span", "license-unknown", "No starter file fits the target profile"));
   main.append(metadata, make("div", "validation-note", model.validation_note));
   const actions = make("div", "model-actions"), view = make("button", "secondary", "View files");
   view.addEventListener("click", () => inspect(model.repository, model.resolved_sha));
@@ -146,8 +225,9 @@ async function browseProvider(provider) {
   section.scrollIntoView({ behavior: "smooth", block: "start" });
   try {
     const data = await api(`/api/providers/${encodeURIComponent(provider.id)}/models?limit=20`);
+    lastProviderResults = data.results;
+    if (!data.results.length) { status.textContent = "No current GGUF repositories"; empty(target, "No GGUF repositories found", "The provider may not currently publish matching files."); return; }
     status.textContent = `${data.results.length} current GGUF repositor${data.results.length === 1 ? "y" : "ies"} · not stored by SaLMon`;
-    if (!data.results.length) { empty(target, "No GGUF repositories found", "The provider may not currently publish matching files."); return; }
     target.replaceChildren(...data.results.map(remoteRow));
   } catch (error) {
     status.textContent = `Provider search failed: ${error.message}`;
@@ -165,7 +245,7 @@ async function inspect(repository, revision = "main") {
   try {
     const data = await api(`/api/inspect?repository=${encodeURIComponent(repository)}&revision=${encodeURIComponent(revision)}`);
     $("#details-status").textContent = "Live metadata from Hugging Face. Compatibility has not been certified.";
-    $("#details-link").href = data.source_url;
+    $("#details-link").href = safeExternalURL(data.source_url);
     renderDetails(data);
   } catch (error) {
     $("#details-status").textContent = `Inspection failed: ${error.message}`;
@@ -189,6 +269,15 @@ function renderDetails(data) {
     facts.append(fact);
   });
   content.append(facts);
+  const licensePanel = make("div", "warning");
+  licensePanel.append(make("strong", "", `Declared license: ${data.plan.license}. `));
+  const licenseURL = safeExternalURL(data.license_url) || safeExternalURL(data.source_url);
+  if (licenseURL) {
+    const link = make("a", "", data.license_url ? "Review license terms ↗" : "Review the model card and inherited terms ↗");
+    link.href = licenseURL; link.target = "_blank"; link.rel = "noreferrer"; licensePanel.append(link);
+  }
+  licensePanel.append(make("span", "", " Metadata is not legal certification."));
+  content.append(licensePanel);
   if (data.plan.warnings?.length) content.append(make("div", "warning", data.plan.warnings.join(" ")));
   const files = make("div", "files");
   files.append(make("h3", "", data.plan.gguf_files.length ? "Available files" : "No direct GGUF files"));
@@ -197,7 +286,8 @@ function renderDetails(data) {
     row.append(
       make("code", "", file.name),
       make("span", "", file.quantization || "Unknown"),
-      make("span", "", formatBytes(file.size_bytes))
+      make("span", "", formatBytes(file.size_bytes)),
+      fitElement(file)
     );
     const installButton = make("button", "secondary", "Install");
     installButton.disabled = !file.sha256 || !file.size_bytes;
@@ -236,9 +326,16 @@ function renderInstallPlan(plan) {
   const list = make("dl", "review");
   [
     ["Repository", plan.repository], ["Commit", plan.resolved_sha], ["File", plan.filename],
-    ["Download", formatBytes(plan.size_bytes)], ["License", plan.license], ["SHA-256", plan.sha256],
-    ["Destination", plan.destination]
+    ["Download", formatBytes(plan.size_bytes)], ["Estimated fit", `${fitFor({ size_bytes: plan.size_bytes }).label} (planning estimate)`],
+    ["License", plan.license], ["SHA-256", plan.sha256], ["Destination", plan.destination]
   ].forEach(([label, value]) => list.append(make("dt", "", label), make("dd", "", String(value || "Unknown"))));
+  const licenseURL = safeExternalURL(plan.license_url) || safeExternalURL(plan.source_url);
+  if (licenseURL) {
+    const link = make("a", "", "Review source and license terms ↗");
+    link.href = licenseURL; link.target = "_blank"; link.rel = "noreferrer";
+    list.append(make("dt", "", "License review"), make("dd", "", ""));
+    list.lastElementChild.append(link);
+  }
   $("#install-summary").replaceChildren(list);
 }
 
@@ -433,6 +530,29 @@ async function removeAssignment(assignment) {
   }
 }
 
+function populateHardwareForm() {
+  $("#target-ram").value = targetProfile.ramGB;
+  $("#target-vram").value = targetProfile.vramGB;
+  $("#target-download").value = targetProfile.maxDownloadGB;
+  $("#target-mode").value = targetProfile.mode;
+  $("#target-summary").textContent = `${targetProfile.ramGB} GB RAM${targetProfile.vramGB ? ` + ${targetProfile.vramGB} GB VRAM` : ""}`;
+  $("#hardware-detected").textContent = detectedRAM ? `Browser reported approximately ${detectedRAM} GB system memory; adjust this for your shipping target.` : "Browser memory detection was unavailable; adjust this for your shipping target.";
+}
+
+$("#hardware-form").addEventListener("submit", event => {
+  event.preventDefault();
+  targetProfile = {
+    ramGB: Number($("#target-ram").value), vramGB: Number($("#target-vram").value),
+    maxDownloadGB: Number($("#target-download").value), mode: $("#target-mode").value
+  };
+  populateHardwareForm();
+  renderStarterModels();
+  refreshFilteredResults();
+  activateView("recommended");
+  $("#starter-status").textContent = "Target profile applied. Fit labels are conservative planning estimates, not performance guarantees.";
+});
+
+populateHardwareForm();
 loadRecommendations();
 
 $("#exit").addEventListener("click", async () => {
