@@ -2,7 +2,15 @@
 
 `salmon-model` is an optional, standalone model discovery and preparation companion for SaLMon. It is **not** part of the GDExtension and is not packaged in the Godot Asset Library addon.
 
-Current scaffold commands:
+Launch the proof-of-concept graphical workflow:
+
+```sh
+salmon-model ui
+```
+
+This opens an embedded browser interface for live search, repository inspection, installation review, verified download progress/cancellation, and installed-model removal. The temporary server binds only to `127.0.0.1` on a random port and stops through the UI, `Ctrl+C`, or process termination. Use `salmon-model ui --no-open` to print the URL without opening a browser.
+
+The automation-friendly CLI remains available:
 
 ```sh
 salmon-model search --query "small dialogue" --format gguf --limit 20
@@ -14,7 +22,7 @@ salmon-model list
 salmon-model remove --id INSTALLATION_ID
 ```
 
-All output is versioned JSON. Search and inspection call Hugging Face live; the companion does not persist listings or maintain a model catalog. Live metadata is explicitly treated as unverified. Mutable revisions are resolved to the commit SHA returned by Hugging Face.
+CLI output is versioned JSON. Search and inspection call Hugging Face live; the companion does not persist listings or maintain a model catalog. Live metadata is explicitly treated as unverified. Mutable revisions are resolved to the commit SHA returned by Hugging Face.
 
 `install-plan` binds the resolved commit, exact file, reported size, content SHA-256, license, and destination into a consent digest. `install` regenerates the live plan and proceeds only when that exact digest is supplied. It uses a bounded temporary file, verifies size and SHA-256, checks the GGUF header, and atomically promotes the file into user-level managed storage. Download progress is JSON Lines on stderr; the final record is JSON on stdout.
 

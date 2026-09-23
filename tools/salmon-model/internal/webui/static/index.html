@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="salmon-token" content="__SALMON_TOKEN__">
+  <title>SaLMon Model Companion</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="mark">S</span><div><strong>SaLMon</strong><small>Model Companion · POC</small></div></div>
+    <nav><button class="nav active" data-view="discover">Discover</button><button class="nav" data-view="installed">Installed</button></nav>
+    <button id="exit" class="quiet">Exit companion</button>
+  </header>
+
+  <main>
+    <section id="discover" class="view active">
+      <div class="hero">
+        <p class="eyebrow">LIVE HUGGING FACE ACCESS</p>
+        <h1>Find a local model for your game.</h1>
+        <p>Results come directly from Hugging Face and are not stored by SaLMon.</p>
+        <form id="search-form" class="search-box">
+          <input id="query" required maxlength="200" placeholder="Try: small dialogue GGUF" value="small GGUF">
+          <select id="format"><option value="gguf">GGUF only</option><option value="any">All models</option></select>
+          <button type="submit" class="primary">Search</button>
+        </form>
+      </div>
+      <div id="search-status" class="status" aria-live="polite"></div>
+      <div id="results" class="cards"></div>
+    </section>
+
+    <section id="installed" class="view">
+      <div class="section-heading"><div><p class="eyebrow">LOCAL STORAGE</p><h1>Installed models</h1><p id="storage-root"></p></div><button id="refresh-installed" class="quiet">Refresh</button></div>
+      <div id="installed-status" class="status" aria-live="polite"></div>
+      <div id="installed-list" class="cards"></div>
+    </section>
+  </main>
+
+  <dialog id="details-dialog">
+    <div class="dialog-head"><div><p class="eyebrow">MODEL DETAILS</p><h2 id="details-title"></h2></div><button class="icon" data-close aria-label="Close">×</button></div>
+    <div id="details-status" class="status" aria-live="polite"></div>
+    <div id="details-content"></div>
+  </dialog>
+
+  <dialog id="install-dialog">
+    <div class="dialog-head"><div><p class="eyebrow">REVIEW INSTALLATION</p><h2>Explicit consent required</h2></div><button class="icon" data-close aria-label="Close">×</button></div>
+    <div id="install-summary"></div>
+    <label class="consent"><input id="consent" type="checkbox"> I reviewed the source, license, exact file, size, hash, and destination.</label>
+    <div id="install-progress" class="progress-area hidden"><div class="progress"><span></span></div><p></p></div>
+    <div id="install-error" class="error" aria-live="assertive"></div>
+    <div class="actions"><button class="quiet" data-close>Cancel</button><button id="confirm-install" class="primary" disabled>Install verified file</button><button id="cancel-download" class="danger hidden">Cancel download</button></div>
+  </dialog>
+
+  <template id="empty-template"><div class="empty"><strong>Nothing here yet.</strong><p>Search Hugging Face or install a model to get started.</p></div></template>
+</body>
+</html>

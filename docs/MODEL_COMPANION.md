@@ -29,9 +29,15 @@ Discovery listings are never cached by SaLMon. Persistence is limited to user-cr
 - Minimal provenance and validation records required to list, select, verify, and remove those files.
 - Optional pinned conversion toolchains installed with explicit consent.
 
+## User interfaces
+
+`salmon-model ui` starts the proof-of-concept graphical workflow in the user's browser. HTML, CSS, and JavaScript are embedded in the same executable; no Node.js/Electron runtime is required. The on-demand server binds to IPv4 loopback on a random port, uses a per-launch mutation token plus strict origin checks, applies a restrictive Content Security Policy, and can be stopped from the page or with `Ctrl+C`. It calls the same Go packages as the CLI rather than spawning CLI subprocesses.
+
+The POC supports live search, inspection, exact installation-plan review, explicit consent, progress, cancellation, installed-model listing, and removal. It does not persist discovery results or run as a permanent service.
+
 ## Protocol
 
-Commands emit a versioned JSON document. Long-running state-changing commands will emit JSON Lines progress events. This protocol is intended for terminals and a future editor frontend without linking the companion into the extension.
+Commands emit a versioned JSON document. Long-running state-changing commands emit JSON Lines progress events. This protocol remains available for terminals, automation, and a future Godot editor frontend without linking the companion into the extension.
 
 Discovery commands are read-only:
 
@@ -59,8 +65,9 @@ The digest binds the resolved commit, exact repository file, reported size, cont
 - Metadata response size and request duration are bounded.
 - No repository code is executed.
 - No `trust_remote_code` behavior is permitted.
-- Download and preparation commands will require explicit consent.
-- Installation will use temporary files, SHA-256 verification where supplied, local GGUF validation, and atomic promotion.
+- Download and preparation commands require explicit consent.
+- Installation uses temporary files, mandatory SHA-256 verification, local GGUF structural validation, and atomic promotion.
+- The browser POC listens only on loopback, uses a random port and per-launch authorization token, checks mutation origins, and exposes no arbitrary URL-fetch endpoint.
 - Missing hashes and licenses are shown as warnings, never silently treated as trusted.
 
 ## Preparation handoff

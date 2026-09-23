@@ -186,6 +186,9 @@ func (c *Client) DownloadFile(ctx context.Context, repository, revision, filenam
 	}
 	request.Header.Set("User-Agent", "salmon-model/0.1 (+https://github.com/Hunter174/SaLMon)")
 	client := *c.http
+	// Metadata requests are short-lived, but multi-gigabyte model downloads must
+	// be bounded by their context, size limit, and caller cancellation instead.
+	client.Timeout = 0
 	client.CheckRedirect = func(request *http.Request, via []*http.Request) error {
 		if request.URL.Scheme != "https" && request.URL.Hostname() != "127.0.0.1" && request.URL.Hostname() != "localhost" {
 			return errors.New("download redirect must use HTTPS")

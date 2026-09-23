@@ -14,6 +14,7 @@ import (
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/webui"
 )
 
 const version = "0.1.0-dev"
@@ -58,6 +59,17 @@ func run(ctx context.Context, arguments []string) error {
 		return err
 	}
 	switch arguments[0] {
+	case "ui":
+		flags := flag.NewFlagSet("ui", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		noOpen := flags.Bool("no-open", false, "print the local URL without opening a browser")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return errors.New("ui accepts flags only")
+		}
+		return webui.Run(ctx, client, webui.Options{OpenBrowser: !*noOpen, Writer: os.Stdout})
 	case "search":
 		flags := flag.NewFlagSet("search", flag.ContinueOnError)
 		flags.SetOutput(os.Stderr)
@@ -258,6 +270,7 @@ func ggufParameters(model hub.Model) int64 {
 
 func usageError() error {
 	return errors.New(strings.TrimSpace(`usage:
+  salmon-model ui [--no-open]
   salmon-model search --query TEXT [--format any|gguf] [--limit 20]
   salmon-model inspect [--revision main] OWNER/REPOSITORY
   salmon-model plan [--revision main] OWNER/REPOSITORY
