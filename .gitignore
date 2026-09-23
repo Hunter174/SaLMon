@@ -11,6 +11,7 @@
 *.so
 *.dylib
 *.mod
+!tools/salmon-model/go.mod
 *.smod
 *.lai
 *.la
