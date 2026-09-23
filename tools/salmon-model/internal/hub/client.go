@@ -28,6 +28,7 @@ type SearchOptions struct {
 	Query  string
 	Format string
 	Limit  int
+	Author string
 }
 
 type ProgressFunc func(completed, total int64)
@@ -117,12 +118,18 @@ func (c *Client) Search(ctx context.Context, options SearchOptions) ([]Model, er
 	if options.Format != "any" && options.Format != "gguf" {
 		return nil, errors.New("format must be any or gguf")
 	}
+	if options.Author != "" && !componentPattern.MatchString(options.Author) {
+		return nil, errors.New("invalid Hugging Face author")
+	}
 	values := url.Values{
 		"search": {options.Query}, "sort": {"downloads"}, "direction": {"-1"},
 		"limit": {strconv.Itoa(options.Limit)}, "full": {"true"}, "config": {"true"},
 	}
 	if options.Format == "gguf" {
 		values.Set("filter", "gguf")
+	}
+	if options.Author != "" {
+		values.Set("author", options.Author)
 	}
 	var models []Model
 	if err := c.getJSON(ctx, c.endpoint+"/api/models?"+values.Encode(), &models); err != nil {

@@ -8,7 +8,7 @@ Launch the proof-of-concept graphical workflow:
 salmon-model ui
 ```
 
-This opens a restrained desktop-style browser interface for live search, repository and quantization inspection, license/provenance review, verified download progress/cancellation, local-model management, and assignment to a project-level `salmon.models.json`. The temporary server binds only to `127.0.0.1` on a random port and stops through the UI, `Ctrl+C`, or process termination. Use `salmon-model ui --no-open` to print the URL without opening a browser.
+This opens a restrained desktop-style browser interface with an auditable starter set, live inventories from reviewed Hugging Face source identities, unrestricted Hub search, repository and quantization inspection, license/provenance review, verified download progress/cancellation, local-model management, and assignment to a project-level `salmon.models.json`. Recommended-source inventories are queried live and are not stored; recommendation never substitutes for compatibility, quality, safety, or license review. The temporary server binds only to `127.0.0.1` on a random port and stops through the UI, `Ctrl+C`, or process termination. Use `salmon-model ui --no-open` to print the URL without opening a browser.
 
 The automation-friendly CLI remains available:
 

@@ -87,6 +87,22 @@ select { padding: 0 10px; }
 .manifest-picker input, .form-stack input[type="text"], .form-stack > label input { width: 100%; height: 38px; padding: 0 10px; }
 .callout { display: flex; gap: 7px; flex-direction: column; max-width: 800px; margin: 17px 0 24px; padding: 13px 15px; background: var(--surface-muted); border-left: 3px solid #8d8d87; color: var(--muted); }
 .callout strong { color: var(--text); }
+.recommendation-warning { max-width: none; margin-top: 0; }
+.section-title { display: flex; justify-content: space-between; align-items: end; margin: 27px 0 10px; }
+.section-title h2 { margin: 0 0 3px; font-size: 16px; }
+.section-title p { margin: 0; color: var(--muted); font-size: 12px; }
+.provider-heading { margin-top: 34px; }
+.provider-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.provider-row { min-height: 145px; padding: 16px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.provider-row:nth-child(2n) { border-right: 0; }
+.provider-row h3 { margin: 0 0 2px; font-size: 14px; }
+.provider-row .category { color: var(--muted); font-size: 12px; }
+.provider-row p { min-height: 40px; margin: 10px 0; color: #4e4e49; font-size: 12px; }
+.provider-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.provider-footer span { color: var(--muted); font-size: 11px; }
+.provider-results-heading { margin-top: 34px; }
+.validation-note { margin-top: 7px; color: #4e4e49; font-size: 12px; }
+.validation-state { color: var(--success) !important; font-weight: 600; }
 
 .kicker { display: block; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
 dialog { width: min(650px, calc(100% - 28px)); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: 0 20px 70px #0003; }
@@ -133,7 +149,7 @@ fieldset label { display: flex; gap: 6px; }
 @media (max-width: 760px) {
   .sidebar { position: static; width: auto; padding: 10px; border-right: 0; border-bottom: 1px solid var(--border); }
   .brand, .sidebar-note, .exit { display: none; }
-  .sidebar nav { grid-template-columns: repeat(3, 1fr); }
+  .sidebar nav { grid-template-columns: repeat(2, 1fr); }
   .nav { justify-content: center; font-size: 12px; }
   main { margin-left: 0; }
   .view { padding: 24px 14px 60px; }
@@ -147,4 +163,6 @@ fieldset label { display: flex; gap: 6px; }
   .file-row span { grid-column: 1; }
   .model-row { grid-template-columns: 1fr; }
   .manifest-picker { grid-template-columns: 1fr; }
+  .provider-list { grid-template-columns: 1fr; }
+  .provider-row { border-right: 0; }
 }

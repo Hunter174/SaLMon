@@ -24,6 +24,7 @@ import (
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/project"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/recommend"
 )
 
 //go:embed static/*
@@ -138,6 +139,8 @@ func (s *Server) routes() http.Handler {
 	static, _ := fs.Sub(assets, "static")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
 	mux.HandleFunc("GET /", s.index)
+	mux.HandleFunc("GET /api/recommendations", s.recommendations)
+	mux.HandleFunc("GET /api/providers/{id}/models", s.providerModels)
 	mux.HandleFunc("GET /api/search", s.search)
 	mux.HandleFunc("GET /api/inspect", s.inspect)
 	mux.HandleFunc("POST /api/install-plan", s.installPlan)
@@ -181,6 +184,42 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	data = []byte(strings.ReplaceAll(string(data), "__SALMON_TOKEN__", s.token))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(data)
+}
+
+func (s *Server) recommendations(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{
+		"providers": recommend.Providers(), "models": recommend.Models(),
+		"policy":  "Provider identities and the small starter set are reviewed by SaLMon. Provider inventories are fetched live from Hugging Face and are not stored.",
+		"warning": "A recommended source is not certification of every model, compatibility, output quality, safety, or commercial licensing.",
+	})
+}
+
+func (s *Server) providerModels(w http.ResponseWriter, r *http.Request) {
+	provider, found := recommend.ProviderByID(r.PathValue("id"))
+	if !found {
+		writeError(w, 404, errors.New("recommended provider was not found"))
+		return
+	}
+	limit, err := strconv.Atoi(defaultValue(r.URL.Query().Get("limit"), "20"))
+	if err != nil {
+		writeError(w, 400, errors.New("invalid result limit"))
+		return
+	}
+	models, err := s.client.Search(r.Context(), hub.SearchOptions{
+		Query: r.URL.Query().Get("q"), Format: "gguf", Limit: limit, Author: provider.Account,
+	})
+	if err != nil {
+		writeError(w, 502, err)
+		return
+	}
+	results := make([]searchResult, 0, len(models))
+	for _, model := range models {
+		results = append(results, searchResult{Repository: model.ID, Downloads: model.Downloads, Likes: model.Likes, Pipeline: model.PipelineTag, Plan: planner.Build(model)})
+	}
+	writeJSON(w, 200, map[string]any{
+		"provider": provider, "results": results,
+		"persistence": "Provider models were fetched live from Hugging Face and were not stored.",
+	})
 }
 
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {

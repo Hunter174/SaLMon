@@ -12,7 +12,8 @@
   <aside class="sidebar">
     <div class="brand"><span class="logo">S</span><span>SaLMon</span></div>
     <nav aria-label="Main navigation">
-      <button class="nav active" data-view="hub"><span>⌕</span>Hugging Face</button>
+      <button class="nav active" data-view="recommended"><span>★</span>Recommended</button>
+      <button class="nav" data-view="hub"><span>⌕</span>Hugging Face</button>
       <button class="nav" data-view="local"><span>↓</span>Local models</button>
       <button class="nav" data-view="project"><span>◇</span>Project manifest</button>
     </nav>
@@ -21,7 +22,24 @@
   </aside>
 
   <main>
-    <section id="hub" class="view active">
+    <section id="recommended" class="view active">
+      <header class="page-header">
+        <div><h1>Recommended</h1><p>A small reviewed starting point for developers who do not know where to begin.</p></div>
+      </header>
+      <div class="callout recommendation-warning"><strong>Recommendation is not certification.</strong><span>Always review the model card and inherited license terms. Test output quality and compatibility in your own game before shipping.</span></div>
+      <div class="section-title"><div><h2>SaLMon starter models</h2><p>Only artifacts exercised by this project appear here.</p></div></div>
+      <div id="starter-status" class="status-text" aria-live="polite"></div>
+      <div id="starter-models" class="model-list"></div>
+      <div class="section-title provider-heading"><div><h2>Recommended sources</h2><p>Selecting a source queries its current GGUF repositories directly from Hugging Face.</p></div></div>
+      <div id="provider-list" class="provider-list"></div>
+      <div id="provider-results-section" class="hidden">
+        <div class="section-title provider-results-heading"><div><h2 id="provider-results-title"></h2><p id="provider-results-note"></p></div><button id="close-provider-results" class="secondary">Close</button></div>
+        <div id="provider-status" class="status-text" aria-live="polite"></div>
+        <div id="provider-results" class="model-list"></div>
+      </div>
+    </section>
+
+    <section id="hub" class="view">
       <header class="page-header">
         <div><h1>Hugging Face</h1><p>Live results. SaLMon does not maintain or cache a model catalog.</p></div>
         <a href="https://huggingface.co/models?library=gguf" target="_blank" rel="noreferrer">Open Hugging Face ↗</a>

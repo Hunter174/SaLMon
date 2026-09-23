@@ -20,9 +20,22 @@ Live metadata is untrusted input. Search presence, tags, popularity, and a `.ggu
 
 No hosted inference endpoint is used.
 
+## Recommended sources and starter models
+
+The UI contains a small, auditable list of recommended Hugging Face source identities—not a mirrored model catalog. Selecting a source performs a fresh Hub query scoped to that account. Initial sources are upstream publishers Qwen and Nomic AI; the llama.cpp/GGUF organization ggml-org; established quantization publishers Unsloth and bartowski; LM Studio Community; and the Second State embedding ecosystem. Hugging Face itself identifies ggml-org, Unsloth, LM Studio Community, and bartowski as prominent GGUF publishers in its [GGUF/llama.cpp integration overview](https://huggingface.co/blog/transformers-llama-cpp-quants).
+
+Each source entry records its category, rationale, caveat, purposes, URL, and review date. Inclusion means the identity and publishing practice were reviewed; it does not endorse every repository owned by that account. Source-model quality, inherited terms, experimental formats, runtime support, and suitability still vary.
+
+A separate starter set is deliberately limited to exact artifacts SaLMon has exercised:
+
+- `unsloth/Qwen3-0.6B-GGUF` Q4_K_M and Q8_0 for chat/decision mechanics. Semantic quality remains uncertified.
+- `second-state/All-MiniLM-L6-v2-Embedding-GGUF` Q4_K_M for embeddings, validated against canonical FP32 cosine geometry.
+
+Starter records are pinned by repository commit, filename, size, SHA-256, validation status, and review date. They are guidance, not a claim of safety or legal certification.
+
 ## Persistence
 
-Discovery listings are never cached by SaLMon. Persistence is limited to user-created state:
+Discovery listings—including live inventories from recommended sources—are never cached by SaLMon. Persistence is limited to user-created state:
 
 - Models explicitly installed by the user.
 - Models explicitly converted or quantized by the user.

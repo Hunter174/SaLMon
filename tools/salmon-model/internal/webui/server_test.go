@@ -77,6 +77,24 @@ func TestUIFlowAndStateChangingAuthorization(t *testing.T) {
 	}
 	searchResponse.Body.Close()
 
+	recommendationResponse, err := http.Get(uiServer.URL + "/api/recommendations")
+	if err != nil || recommendationResponse.StatusCode != http.StatusOK {
+		t.Fatalf("recommendations failed: %v", err)
+	}
+	var recommendations struct{ Providers, Models []any }
+	if err := json.NewDecoder(recommendationResponse.Body).Decode(&recommendations); err != nil {
+		t.Fatal(err)
+	}
+	recommendationResponse.Body.Close()
+	if len(recommendations.Providers) == 0 || len(recommendations.Models) == 0 {
+		t.Fatal("reviewed recommendations are empty")
+	}
+	providerResponse, err := http.Get(uiServer.URL + "/api/providers/unsloth/models?limit=5")
+	if err != nil || providerResponse.StatusCode != http.StatusOK {
+		t.Fatalf("provider search failed: %v", err)
+	}
+	providerResponse.Body.Close()
+
 	planBody := `{"repository":"owner/model","revision":"main","filename":"model-Q4_K_M.gguf"}`
 	planResponse := authorizedRequest(t, uiServer.URL+"/api/install-plan", http.MethodPost, planBody, server)
 	var plan struct {

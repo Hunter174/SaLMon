@@ -40,6 +40,7 @@ function activateView(name) {
   document.querySelector(`.nav[data-view="${name}"]`).classList.add("active");
   $(`#${name}`).classList.add("active");
   if (name === "local") loadInstalled();
+  if (name === "recommended") loadRecommendations();
 }
 
 document.querySelectorAll(".nav[data-view]").forEach(button => {
@@ -91,7 +92,70 @@ function remoteRow(result) {
   return row;
 }
 
-async function inspect(repository) {
+let recommendationsLoaded = false;
+async function loadRecommendations() {
+  if (recommendationsLoaded) return;
+  $("#starter-status").textContent = "Loading reviewed sources…";
+  try {
+    const data = await api("/api/recommendations");
+    $("#starter-status").textContent = data.warning;
+    $("#starter-models").replaceChildren(...data.models.map(starterRow));
+    $("#provider-list").replaceChildren(...data.providers.map(providerRow));
+    recommendationsLoaded = true;
+  } catch (error) {
+    $("#starter-status").textContent = `Could not load recommendations: ${error.message}`;
+  }
+}
+
+function starterRow(model) {
+  const row = make("article", "model-row"), main = make("div", "model-main");
+  main.append(make("div", "model-name", model.name));
+  const metadata = make("div", "model-meta");
+  metadata.append(
+    make("span", "validation-state", model.validation_status.replaceAll("_", " ")),
+    make("span", "", model.purposes.join(" + ")), make("span", "", `License: ${model.license}`),
+    make("span", "", model.files.map(file => file.quantization).join(" / ")),
+    make("span", "", model.repository)
+  );
+  main.append(metadata, make("div", "validation-note", model.validation_note));
+  const actions = make("div", "model-actions"), view = make("button", "secondary", "View files");
+  view.addEventListener("click", () => inspect(model.repository, model.resolved_sha));
+  actions.append(view);
+  row.append(main, actions);
+  return row;
+}
+
+function providerRow(provider) {
+  const row = make("article", "provider-row");
+  row.append(make("h3", "", provider.name), make("div", "category", provider.category), make("p", "", provider.rationale));
+  const footer = make("div", "provider-footer");
+  footer.append(make("span", "", provider.purposes.join(" · ")));
+  const browse = make("button", "secondary", "Browse live models");
+  browse.addEventListener("click", () => browseProvider(provider));
+  footer.append(browse); row.append(footer);
+  return row;
+}
+
+async function browseProvider(provider) {
+  const section = $("#provider-results-section"), target = $("#provider-results"), status = $("#provider-status");
+  section.classList.remove("hidden");
+  $("#provider-results-title").textContent = provider.name;
+  $("#provider-results-note").textContent = provider.caveat;
+  status.textContent = "Querying Hugging Face live…";
+  target.replaceChildren();
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+  try {
+    const data = await api(`/api/providers/${encodeURIComponent(provider.id)}/models?limit=20`);
+    status.textContent = `${data.results.length} current GGUF repositor${data.results.length === 1 ? "y" : "ies"} · not stored by SaLMon`;
+    if (!data.results.length) { empty(target, "No GGUF repositories found", "The provider may not currently publish matching files."); return; }
+    target.replaceChildren(...data.results.map(remoteRow));
+  } catch (error) {
+    status.textContent = `Provider search failed: ${error.message}`;
+  }
+}
+$("#close-provider-results").addEventListener("click", () => $("#provider-results-section").classList.add("hidden"));
+
+async function inspect(repository, revision = "main") {
   const dialog = $("#details-dialog");
   $("#details-title").textContent = repository;
   $("#details-status").textContent = "Resolving repository metadata…";
@@ -99,7 +163,7 @@ async function inspect(repository) {
   $("#details-content").replaceChildren();
   dialog.showModal();
   try {
-    const data = await api(`/api/inspect?repository=${encodeURIComponent(repository)}&revision=main`);
+    const data = await api(`/api/inspect?repository=${encodeURIComponent(repository)}&revision=${encodeURIComponent(revision)}`);
     $("#details-status").textContent = "Live metadata from Hugging Face. Compatibility has not been certified.";
     $("#details-link").href = data.source_url;
     renderDetails(data);
@@ -138,7 +202,7 @@ function renderDetails(data) {
     const installButton = make("button", "secondary", "Install");
     installButton.disabled = !file.sha256 || !file.size_bytes;
     installButton.title = installButton.disabled ? "A reported size and SHA-256 are required" : "Review this installation";
-    installButton.addEventListener("click", () => prepareInstall(data.repository, file.name));
+    installButton.addEventListener("click", () => prepareInstall(data.repository, file.name, data.resolved_sha));
     row.append(installButton);
     files.append(row);
   });
@@ -147,7 +211,7 @@ function renderDetails(data) {
 
 let pendingPlan = null, currentJob = null, pollTimer = null;
 
-async function prepareInstall(repository, filename) {
+async function prepareInstall(repository, filename, revision = "main") {
   $("#details-dialog").close();
   const dialog = $("#install-dialog");
   $("#install-summary").replaceChildren(make("span", "", "Building an exact installation plan…"));
@@ -160,7 +224,7 @@ async function prepareInstall(repository, filename) {
   dialog.showModal();
   try {
     pendingPlan = await api("/api/install-plan", {
-      method: "POST", body: JSON.stringify({ repository, revision: "main", filename })
+      method: "POST", body: JSON.stringify({ repository, revision, filename })
     });
     renderInstallPlan(pendingPlan);
   } catch (error) {
@@ -368,6 +432,8 @@ async function removeAssignment(assignment) {
     $("#project-status").textContent = `Could not remove assignment: ${error.message}`;
   }
 }
+
+loadRecommendations();
 
 $("#exit").addEventListener("click", async () => {
   if (!confirm("Quit the SaLMon model companion?")) return;

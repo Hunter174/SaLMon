@@ -13,7 +13,7 @@ func TestSearchIsLiveAndNormalized(t *testing.T) {
 		if r.URL.Path != "/api/models" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("filter") != "gguf" || r.URL.Query().Get("full") != "true" {
+		if r.URL.Query().Get("filter") != "gguf" || r.URL.Query().Get("full") != "true" || r.URL.Query().Get("author") != "owner" {
 			t.Fatalf("missing search controls: %s", r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -24,7 +24,7 @@ func TestSearchIsLiveAndNormalized(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	models, err := client.Search(context.Background(), SearchOptions{Query: "small model", Format: "gguf", Limit: 5})
+	models, err := client.Search(context.Background(), SearchOptions{Query: "small model", Format: "gguf", Limit: 5, Author: "owner"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,6 +58,9 @@ func TestRejectsUnsafeInputs(t *testing.T) {
 	}
 	if _, err := client.Search(context.Background(), SearchOptions{Query: strings.Repeat("x", 201), Format: "any", Limit: 1}); err == nil {
 		t.Fatal("oversized query accepted")
+	}
+	if _, err := client.Search(context.Background(), SearchOptions{Query: "test", Format: "gguf", Limit: 1, Author: "../owner"}); err == nil {
+		t.Fatal("unsafe author accepted")
 	}
 }
 
