@@ -33,7 +33,7 @@ Discovery listings are never cached by SaLMon. Persistence is limited to user-cr
 
 `salmon-model ui` starts the proof-of-concept graphical workflow in the user's browser. HTML, CSS, and JavaScript are embedded in the same executable; no Node.js/Electron runtime is required. The on-demand server binds to IPv4 loopback on a random port, uses a per-launch mutation token plus strict origin checks, applies a restrictive Content Security Policy, and can be stopped from the page or with `Ctrl+C`. It calls the same Go packages as the CLI rather than spawning CLI subprocesses.
 
-The POC supports live search, inspection, exact installation-plan review, explicit consent, progress, cancellation, installed-model listing, and removal. It does not persist discovery results or run as a permanent service.
+The POC supports live search, repository/file inspection, exact installation-plan review, explicit consent, progress, cancellation, installed-model management, and project-manifest assignment. Its restrained desktop-tool layout follows patterns from [Hugging Face's scannable model list](https://huggingface.co/models), [LM Studio's repository-first quantization selection](https://lmstudio.ai/docs/app/basics/download-model), [Jan's plain-language local-model guidance](https://github.com/janhq/jan/blob/dev/docs/src/pages/docs/desktop/manage-models.mdx), and [Docker Desktop's separation of Hub and local images](https://docs.docker.com/desktop/use-desktop/images/). It does not persist discovery results or run as a permanent service.
 
 ## Protocol
 
@@ -57,6 +57,12 @@ salmon-model remove --id INSTALLATION_ID
 ```
 
 The digest binds the resolved commit, exact repository file, reported size, content SHA-256, license, and destination. Installation refuses files without a Hub-reported SHA-256, applies a configurable size limit, streams to a same-store temporary file, verifies size/hash and the GGUF header, then atomically promotes it. Structural validation is not represented as successful llama.cpp runtime validation.
+
+## Project manifest
+
+The UI can assign an explicitly installed model to a project-level `salmon.models.json`. The manifest records purposes (`chat`, `decision`, or `embedding`), installation ID, SHA-256, repository, immutable revision, source filename, export-relative destination, declared license/link, base-model metadata, and source URL. It deliberately omits the machine-specific installed path.
+
+Creating a manifest does not export or copy weights. A later build-staging command will resolve each installation ID and hash against the local registry, copy the verified GGUF into the game distribution, and verify the staged copy. License information is provenance for developer review, not legal certification.
 
 ## Security decisions
 

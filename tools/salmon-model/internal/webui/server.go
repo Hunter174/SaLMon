@@ -23,6 +23,7 @@ import (
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/project"
 )
 
 //go:embed static/*
@@ -65,6 +66,13 @@ type installRequest struct {
 	Revision      string `json:"revision"`
 	Filename      string `json:"filename"`
 	ConsentDigest string `json:"consent_digest"`
+}
+
+type projectRequest struct {
+	ManifestPath   string   `json:"manifest_path"`
+	InstallationID string   `json:"installation_id"`
+	Purposes       []string `json:"purposes"`
+	ExportPath     string   `json:"export_path"`
 }
 
 type searchResult struct {
@@ -138,6 +146,9 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/jobs/{id}", s.cancelJob)
 	mux.HandleFunc("GET /api/installed", s.installed)
 	mux.HandleFunc("DELETE /api/installed/{id}", s.remove)
+	mux.HandleFunc("GET /api/project", s.projectManifest)
+	mux.HandleFunc("POST /api/project/assign", s.assignProject)
+	mux.HandleFunc("DELETE /api/project/assignment", s.removeProjectAssignment)
 	mux.HandleFunc("POST /api/shutdown", s.shutdown)
 	return s.securityHeaders(mux)
 }
@@ -196,7 +207,12 @@ func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 502, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"repository": model.ID, "resolved_sha": model.SHA, "downloads": model.Downloads, "likes": model.Likes, "pipeline": model.PipelineTag, "plan": planner.Build(model)})
+	writeJSON(w, 200, map[string]any{
+		"repository": model.ID, "resolved_sha": model.SHA, "downloads": model.Downloads,
+		"likes": model.Likes, "pipeline": model.PipelineTag, "plan": planner.Build(model),
+		"license_url": model.CardData.LicenseLink, "base_model": model.CardData.BaseModel,
+		"source_url": "https://huggingface.co/" + model.ID + "/tree/" + model.SHA,
+	})
 }
 
 func (s *Server) installPlan(w http.ResponseWriter, r *http.Request) {
@@ -330,6 +346,59 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"removed": record})
+}
+
+func (s *Server) projectManifest(w http.ResponseWriter, r *http.Request) {
+	manifest, err := project.Load(r.URL.Query().Get("path"))
+	if err != nil {
+		writeError(w, 400, err)
+		return
+	}
+	writeJSON(w, 200, manifest)
+}
+
+func (s *Server) assignProject(w http.ResponseWriter, r *http.Request) {
+	var request projectRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, 400, err)
+		return
+	}
+	records, err := install.List(s.root)
+	if err != nil {
+		writeError(w, 500, err)
+		return
+	}
+	var selected *install.Record
+	for index := range records {
+		if records[index].ID == request.InstallationID {
+			selected = &records[index]
+			break
+		}
+	}
+	if selected == nil {
+		writeError(w, 404, errors.New("installed model was not found"))
+		return
+	}
+	manifest, err := project.Assign(request.ManifestPath, *selected, request.Purposes, request.ExportPath)
+	if err != nil {
+		writeError(w, 400, err)
+		return
+	}
+	writeJSON(w, 200, manifest)
+}
+
+func (s *Server) removeProjectAssignment(w http.ResponseWriter, r *http.Request) {
+	var request projectRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, 400, err)
+		return
+	}
+	manifest, err := project.Remove(request.ManifestPath, request.ExportPath)
+	if err != nil {
+		writeError(w, 400, err)
+		return
+	}
+	writeJSON(w, 200, manifest)
 }
 
 func (s *Server) shutdown(w http.ResponseWriter, r *http.Request) {

@@ -34,6 +34,7 @@ type Plan struct {
 	SHA256        string `json:"sha256"`
 	License       string `json:"license"`
 	LicenseURL    string `json:"license_url,omitempty"`
+	BaseModel     any    `json:"base_model,omitempty"`
 	SourceURL     string `json:"source_url"`
 	Destination   string `json:"destination"`
 	ConsentDigest string `json:"consent_digest,omitempty"`
@@ -50,6 +51,7 @@ type Record struct {
 	SHA256               string `json:"sha256"`
 	License              string `json:"license"`
 	LicenseURL           string `json:"license_url,omitempty"`
+	BaseModel            any    `json:"base_model,omitempty"`
 	SourceURL            string `json:"source_url"`
 	Path                 string `json:"path"`
 	InstalledAt          string `json:"installed_at"`
@@ -115,7 +117,7 @@ func BuildPlan(model hub.Model, filename, root string) (Plan, error) {
 	plan := Plan{
 		SchemaVersion: 1, Repository: model.ID, ResolvedSHA: model.SHA,
 		Filename: filename, SizeBytes: selected.SizeBytes, SHA256: selected.SHA256,
-		License: modelPlan.License, LicenseURL: model.CardData.LicenseLink,
+		License: modelPlan.License, LicenseURL: model.CardData.LicenseLink, BaseModel: model.CardData.BaseModel,
 		SourceURL: "https://huggingface.co/" + model.ID + "/tree/" + model.SHA, Destination: destination,
 		Warning: "Installation is local-only. Live Hugging Face metadata is not a SaLMon compatibility certification.",
 	}
@@ -226,7 +228,7 @@ func Execute(ctx context.Context, client *hub.Client, plan Plan, consent, root s
 	record := Record{
 		SchemaVersion: 1, ID: installationID(plan), Repository: plan.Repository, ResolvedSHA: plan.ResolvedSHA,
 		Filename: plan.Filename, SizeBytes: plan.SizeBytes, SHA256: strings.ToLower(plan.SHA256), License: plan.License,
-		LicenseURL: plan.LicenseURL, SourceURL: plan.SourceURL,
+		LicenseURL: plan.LicenseURL, BaseModel: plan.BaseModel, SourceURL: plan.SourceURL,
 		Path: expectedDestination, InstalledAt: time.Now().UTC().Format(time.RFC3339),
 		StructuralValidation: "gguf-header-passed", RuntimeValidation: "not-run",
 	}

@@ -8,7 +8,7 @@ Launch the proof-of-concept graphical workflow:
 salmon-model ui
 ```
 
-This opens an embedded browser interface for live search, repository inspection, installation review, verified download progress/cancellation, and installed-model removal. The temporary server binds only to `127.0.0.1` on a random port and stops through the UI, `Ctrl+C`, or process termination. Use `salmon-model ui --no-open` to print the URL without opening a browser.
+This opens a restrained desktop-style browser interface for live search, repository and quantization inspection, license/provenance review, verified download progress/cancellation, local-model management, and assignment to a project-level `salmon.models.json`. The temporary server binds only to `127.0.0.1` on a random port and stops through the UI, `Ctrl+C`, or process termination. Use `salmon-model ui --no-open` to print the URL without opening a browser.
 
 The automation-friendly CLI remains available:
 

@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -111,6 +113,28 @@ func TestUIFlowAndStateChangingAuthorization(t *testing.T) {
 	}
 	if job.Status != "completed" || job.Record == nil || job.Record.SHA256 != hash {
 		t.Fatalf("installation job failed: %#v", job)
+	}
+
+	manifestPath := filepath.Join(t.TempDir(), "salmon.models.json")
+	assignment, _ := json.Marshal(map[string]any{
+		"manifest_path": manifestPath, "installation_id": job.Record.ID,
+		"purposes": []string{"chat", "decision"}, "export_path": "models/dialogue.gguf",
+	})
+	assignmentResponse := authorizedRequest(t, uiServer.URL+"/api/project/assign", http.MethodPost, string(assignment), server)
+	assignmentResponse.Body.Close()
+	manifestResponse, err := http.Get(uiServer.URL + "/api/project?path=" + url.QueryEscape(manifestPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Models []any `json:"models"`
+	}
+	if err := json.NewDecoder(manifestResponse.Body).Decode(&manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifestResponse.Body.Close()
+	if len(manifest.Models) != 1 {
+		t.Fatalf("project assignment was not saved: %#v", manifest)
 	}
 }
 

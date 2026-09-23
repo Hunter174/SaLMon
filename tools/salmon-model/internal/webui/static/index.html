@@ -4,55 +4,87 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="salmon-token" content="__SALMON_TOKEN__">
-  <title>SaLMon Model Companion</title>
+  <title>SaLMon Models</title>
   <link rel="stylesheet" href="/static/style.css">
   <script defer src="/static/app.js"></script>
 </head>
 <body>
-  <header>
-    <div class="brand"><span class="mark">S</span><div><strong>SaLMon</strong><small>Model Companion · POC</small></div></div>
-    <nav><button class="nav active" data-view="discover">Discover</button><button class="nav" data-view="installed">Installed</button></nav>
-    <button id="exit" class="quiet">Exit companion</button>
-  </header>
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">S</span><span>SaLMon</span></div>
+    <nav aria-label="Main navigation">
+      <button class="nav active" data-view="hub"><span>⌕</span>Hugging Face</button>
+      <button class="nav" data-view="local"><span>↓</span>Local models</button>
+      <button class="nav" data-view="project"><span>◇</span>Project manifest</button>
+    </nav>
+    <div class="sidebar-note"><span class="status-dot"></span> Companion running locally</div>
+    <button id="exit" class="nav exit"><span>×</span>Quit</button>
+  </aside>
 
   <main>
-    <section id="discover" class="view active">
-      <div class="hero">
-        <p class="eyebrow">LIVE HUGGING FACE ACCESS</p>
-        <h1>Find a local model for your game.</h1>
-        <p>Results come directly from Hugging Face and are not stored by SaLMon.</p>
-        <form id="search-form" class="search-box">
-          <input id="query" required maxlength="200" placeholder="Try: small dialogue GGUF" value="small GGUF">
-          <select id="format"><option value="gguf">GGUF only</option><option value="any">All models</option></select>
-          <button type="submit" class="primary">Search</button>
-        </form>
-      </div>
-      <div id="search-status" class="status" aria-live="polite"></div>
-      <div id="results" class="cards"></div>
+    <section id="hub" class="view active">
+      <header class="page-header">
+        <div><h1>Hugging Face</h1><p>Live results. SaLMon does not maintain or cache a model catalog.</p></div>
+        <a href="https://huggingface.co/models?library=gguf" target="_blank" rel="noreferrer">Open Hugging Face ↗</a>
+      </header>
+      <form id="search-form" class="toolbar">
+        <label class="search"><span>⌕</span><input id="query" required maxlength="200" placeholder="Search by model or repository" value="Qwen3 0.6B GGUF"></label>
+        <select id="format" aria-label="Model format"><option value="gguf">GGUF only</option><option value="any">Any format</option></select>
+        <button type="submit" class="primary">Search</button>
+      </form>
+      <div class="source-line"><strong>Source</strong> Hugging Face Hub API <span>·</span> Results are unverified until installed and tested.</div>
+      <div id="search-status" class="status-text" aria-live="polite"></div>
+      <div id="results" class="model-list"></div>
     </section>
 
-    <section id="installed" class="view">
-      <div class="section-heading"><div><p class="eyebrow">LOCAL STORAGE</p><h1>Installed models</h1><p id="storage-root"></p></div><button id="refresh-installed" class="quiet">Refresh</button></div>
-      <div id="installed-status" class="status" aria-live="polite"></div>
-      <div id="installed-list" class="cards"></div>
+    <section id="local" class="view">
+      <header class="page-header">
+        <div><h1>Local models</h1><p>GGUF files explicitly installed and verified by the companion.</p></div>
+        <button id="refresh-installed" class="secondary">Refresh</button>
+      </header>
+      <div class="storage-bar"><div><span>Storage location</span><code id="storage-root">—</code></div><strong id="storage-summary">—</strong></div>
+      <div id="installed-status" class="status-text" aria-live="polite"></div>
+      <div id="installed-list" class="model-list"></div>
+    </section>
+
+    <section id="project" class="view">
+      <header class="page-header">
+        <div><h1>Project manifest</h1><p>Assign local models to a game. Export tooling will later copy verified files from this manifest.</p></div>
+      </header>
+      <div class="manifest-picker">
+        <label><span>Manifest path</span><input id="manifest-path" placeholder="C:\path\to\game\salmon.models.json"></label>
+        <button id="load-manifest" class="secondary">Open</button>
+      </div>
+      <div class="callout"><strong>This does not export or copy a model.</strong><span>The manifest stores model purpose, content hash, immutable source, license metadata, and the intended export-relative path. Machine-specific model paths are not written to the project.</span></div>
+      <div id="project-status" class="status-text" aria-live="polite"></div>
+      <div id="project-list" class="model-list"></div>
     </section>
   </main>
 
-  <dialog id="details-dialog">
-    <div class="dialog-head"><div><p class="eyebrow">MODEL DETAILS</p><h2 id="details-title"></h2></div><button class="icon" data-close aria-label="Close">×</button></div>
-    <div id="details-status" class="status" aria-live="polite"></div>
+  <dialog id="details-dialog" class="sheet">
+    <div class="dialog-header"><div><span class="kicker">Hugging Face repository</span><h2 id="details-title"></h2></div><button class="close" data-close aria-label="Close">×</button></div>
+    <div class="details-source"><div id="details-status" class="status-text" aria-live="polite"></div><a id="details-link" target="_blank" rel="noreferrer">Review model card and license ↗</a></div>
     <div id="details-content"></div>
   </dialog>
 
   <dialog id="install-dialog">
-    <div class="dialog-head"><div><p class="eyebrow">REVIEW INSTALLATION</p><h2>Explicit consent required</h2></div><button class="icon" data-close aria-label="Close">×</button></div>
-    <div id="install-summary"></div>
-    <label class="consent"><input id="consent" type="checkbox"> I reviewed the source, license, exact file, size, hash, and destination.</label>
-    <div id="install-progress" class="progress-area hidden"><div class="progress"><span></span></div><p></p></div>
+    <div class="dialog-header"><div><span class="kicker">Install GGUF</span><h2>Review before downloading</h2></div><button class="close" data-close aria-label="Close">×</button></div>
+    <div id="install-summary" class="dialog-body"></div>
+    <label class="consent"><input id="consent" type="checkbox"><span>I reviewed the repository, license, file size, SHA-256, and destination.</span></label>
+    <div id="install-progress" class="progress-area hidden"><progress max="100" value="0"></progress><p></p></div>
     <div id="install-error" class="error" aria-live="assertive"></div>
-    <div class="actions"><button class="quiet" data-close>Cancel</button><button id="confirm-install" class="primary" disabled>Install verified file</button><button id="cancel-download" class="danger hidden">Cancel download</button></div>
+    <div class="dialog-actions"><button class="secondary" data-close>Cancel</button><button id="confirm-install" class="primary" disabled>Download and verify</button><button id="cancel-download" class="danger hidden">Cancel download</button></div>
   </dialog>
 
-  <template id="empty-template"><div class="empty"><strong>Nothing here yet.</strong><p>Search Hugging Face or install a model to get started.</p></div></template>
+  <dialog id="assign-dialog">
+    <div class="dialog-header"><div><span class="kicker">Project assignment</span><h2 id="assign-title">Add model to manifest</h2></div><button class="close" data-close aria-label="Close">×</button></div>
+    <form id="assign-form" class="dialog-body form-stack">
+      <label><span>Manifest</span><input id="assign-manifest" required placeholder="C:\path\to\game\salmon.models.json"></label>
+      <fieldset><legend>Purpose</legend><label><input type="checkbox" name="purpose" value="chat"> Chat</label><label><input type="checkbox" name="purpose" value="decision"> Decisions</label><label><input type="checkbox" name="purpose" value="embedding"> Embeddings</label></fieldset>
+      <label><span>Export-relative model path</span><input id="assign-export" required value="models/model.gguf"></label>
+      <div id="assign-license" class="license-panel"></div>
+      <div id="assign-error" class="error" aria-live="assertive"></div>
+      <div class="dialog-actions inset"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary">Save assignment</button></div>
+    </form>
+  </dialog>
 </body>
 </html>
