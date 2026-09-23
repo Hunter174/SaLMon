@@ -6,20 +6,22 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/compat"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
 )
 
 type Plan struct {
-	Classification string     `json:"classification"`
-	Explanation    string     `json:"explanation"`
-	ResolvedSHA    string     `json:"resolved_sha"`
-	License        string     `json:"license"`
-	Architecture   string     `json:"architecture,omitempty"`
-	Purposes       []string   `json:"candidate_purposes"`
-	GGUFFiles      []GGUFFile `json:"gguf_files"`
-	SourceFormat   string     `json:"source_format,omitempty"`
-	Actions        []string   `json:"available_actions"`
-	Warnings       []string   `json:"warnings"`
+	Classification string            `json:"classification"`
+	Explanation    string            `json:"explanation"`
+	ResolvedSHA    string            `json:"resolved_sha"`
+	License        string            `json:"license"`
+	Architecture   string            `json:"architecture,omitempty"`
+	Purposes       []string          `json:"candidate_purposes"`
+	GGUFFiles      []GGUFFile        `json:"gguf_files"`
+	SourceFormat   string            `json:"source_format,omitempty"`
+	Actions        []string          `json:"available_actions"`
+	Warnings       []string          `json:"warnings"`
+	Preparation    compat.Assessment `json:"preparation"`
 }
 
 type GGUFFile struct {
@@ -39,6 +41,7 @@ func Build(model hub.Model) Plan {
 		Architecture: architecture(model),
 		Purposes:     purposes(model.PipelineTag),
 		GGUFFiles:    []GGUFFile{}, Actions: []string{}, Warnings: []string{},
+		Preparation: compat.Assess(model),
 	}
 	for _, file := range model.Siblings {
 		if !strings.EqualFold(filepath.Ext(file.Name), ".gguf") {
@@ -64,15 +67,11 @@ func Build(model hub.Model) Plan {
 			}
 		}
 	} else {
-		plan.SourceFormat = sourceFormat(model.Siblings)
-		if plan.SourceFormat != "" && plan.Architecture != "" {
-			plan.Classification = "unverified_conversion_candidate"
-			plan.Explanation = "No GGUF is available. Source weights and architecture metadata exist, but compatibility with the pinned converter has not yet been proven."
-			plan.Actions = []string{"find_gguf_variant", "check_conversion_support", "import_local_gguf"}
-		} else {
-			plan.Classification = "unknown_or_unsupported"
-			plan.Explanation = "No directly usable GGUF was found and the repository does not expose enough metadata to propose conversion safely."
-			plan.Actions = []string{"find_gguf_variant", "import_local_gguf"}
+		plan.SourceFormat = plan.Preparation.SourceFormat
+		plan.Classification = plan.Preparation.Status
+		plan.Explanation = plan.Preparation.Explanation
+		for _, action := range plan.Preparation.Actions {
+			plan.Actions = append(plan.Actions, action.ID)
 		}
 	}
 	if plan.License == "unknown" {
@@ -98,11 +97,11 @@ func architecture(model hub.Model) string {
 	if model.GGUF != nil && model.GGUF.Architecture != "" {
 		return model.GGUF.Architecture
 	}
-	if model.Config.ModelType != "" {
-		return model.Config.ModelType
-	}
 	if len(model.Config.Architectures) > 0 {
 		return model.Config.Architectures[0]
+	}
+	if model.Config.ModelType != "" {
+		return model.Config.ModelType
 	}
 	return ""
 }

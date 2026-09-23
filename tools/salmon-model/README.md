@@ -24,6 +24,8 @@ salmon-model remove --id INSTALLATION_ID
 
 CLI output is versioned JSON. Search and inspection call Hugging Face live; the companion does not persist listings or maintain a model catalog. Live metadata is explicitly treated as unverified. Mutable revisions are resolved to the commit SHA returned by Hugging Face.
 
+For non-GGUF repositories, inspection compares declared architectures with a generated matrix from SaLMon's pinned llama.cpp converter. It distinguishes recognized, incomplete, unknown, and unsupported sources; lists detected source files and missing requirements; and reports approximate output and peak-disk ranges. Preparation remains disabled until the separate pinned toolchain is implemented, and converter recognition is not runtime certification.
+
 `install-plan` binds the resolved commit, exact file, reported size, content SHA-256, license, and destination into a consent digest. `install` regenerates the live plan and proceeds only when that exact digest is supplied. It uses a bounded temporary file, verifies size and SHA-256, checks the GGUF header, and atomically promotes the file into user-level managed storage. Download progress is JSON Lines on stderr; the final record is JSON on stdout.
 
 Installation performs structural validation only and records runtime validation as `not-run`. Conversion and quantization are not implemented yet.

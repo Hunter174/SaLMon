@@ -21,17 +21,26 @@ func TestDirectGGUFPlanUsesResolvedFileIdentity(t *testing.T) {
 	}
 }
 
-func TestSourceModelIsOnlyUnverifiedCandidate(t *testing.T) {
-	model := hub.Model{SHA: "commit", Config: hub.ModelConfig{ModelType: "bert"}, Siblings: []hub.File{{Name: "model.safetensors"}}}
+func TestRecognizedCompleteSourceRequiresOptionalToolchain(t *testing.T) {
+	model := hub.Model{
+		SHA: "commit", Config: hub.ModelConfig{ModelType: "qwen3", Architectures: []string{"Qwen3ForCausalLM"}},
+		Siblings: []hub.File{
+			{Name: "config.json"}, {Name: "tokenizer.json"},
+			{Name: "model.safetensors", Size: 200, LFS: &hub.LFSInfo{SHA256: "abcd", Size: 200}},
+		},
+	}
 	plan := Build(model)
-	if plan.Classification != "unverified_conversion_candidate" || plan.SourceFormat != "safetensors" {
+	if plan.Classification != "conversion_toolchain_required" || plan.SourceFormat != "safetensors" {
 		t.Fatalf("unexpected plan: %#v", plan)
+	}
+	if len(plan.Preparation.OutputEstimates) == 0 || plan.Preparation.Actions[2].Available {
+		t.Fatalf("expected estimates and a disabled preparation handoff: %#v", plan.Preparation)
 	}
 }
 
 func TestMissingMetadataDoesNotClaimConversion(t *testing.T) {
 	plan := Build(hub.Model{SHA: "commit", Siblings: []hub.File{{Name: "weights.bin"}}})
-	if plan.Classification != "unknown_or_unsupported" {
+	if plan.Classification != "unknown_architecture" || len(plan.Preparation.MissingRequirements) == 0 {
 		t.Fatalf("unexpected plan: %#v", plan)
 	}
 }

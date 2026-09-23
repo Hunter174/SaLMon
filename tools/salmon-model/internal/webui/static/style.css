@@ -153,6 +153,15 @@ fieldset { display: flex; gap: 18px; padding: 12px; border: 1px solid var(--bord
 fieldset legend { padding: 0 5px; color: var(--muted); font-size: 12px; }
 fieldset label { display: flex; gap: 6px; }
 .license-panel { padding: 12px; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 6px; font-size: 12px; }
+.preparation { display: grid; gap: 12px; margin-top: 12px; padding: 14px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 7px; }
+.preparation h3, .preparation h4, .preparation p { margin: 0; }
+.preparation-status strong { text-transform: capitalize; }
+.preparation-status p, .fine-print { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.facts.compact { grid-template-columns: 120px minmax(0, 1fr); margin: 0; }
+.source-files, .estimate-list { display: grid; grid-template-columns: minmax(180px, 1fr) 100px 110px 140px; align-items: center; gap: 0 12px; font-size: 12px; }
+.source-files > *, .estimate-list > * { min-width: 0; padding: 7px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.preparation-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.preparation-actions button:disabled { opacity: .55; cursor: not-allowed; }
 .hardware-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; max-width: 800px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .hardware-form > label { display: grid; gap: 6px; font-weight: 600; }
 .hardware-form > label > div { display: flex; align-items: center; }

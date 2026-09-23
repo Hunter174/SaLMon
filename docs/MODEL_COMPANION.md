@@ -33,6 +33,27 @@ A separate starter set is deliberately limited to exact artifacts SaLMon has exe
 
 Starter records are pinned by repository commit, filename, size, SHA-256, validation status, and review date. They are guidance, not a claim of safety or legal certification.
 
+## Discovery-to-preparation assessment
+
+For repositories without GGUF files, `inspect` and the browser UI now compare declared `config.architectures` values with a generated matrix from the pinned llama.cpp `convert_hf_to_gguf.py` at commit `bf78f5439ee8e82e367674043303ebf8e92b4805`. The assessment reports:
+
+- direct GGUF availability, recognized conversion candidates, incomplete sources, unknown architectures, or unsupported architectures;
+- detected configuration, tokenizer, weight, and weight-index files;
+- missing source requirements and absent source-weight SHA-256 metadata;
+- source-weight totals plus explicitly approximate F16, Q8, Q5, and Q4 output/peak-disk ranges;
+- multimodal-projector caveats because SaLMon's current API supports text and embeddings, not multimodal inputs;
+- distinct actions for finding a GGUF, using a local GGUF, and preparing source weights.
+
+The conversion action intentionally remains disabled until the separate pinned, consented toolchain from issue #18 is available. Recognition by the converter matrix is not runtime compatibility or output-quality certification. PyTorch pickle-only sources receive an additional isolation warning; arbitrary repository code and `trust_remote_code` remain prohibited.
+
+Maintainers regenerate the committed matrix after updating pinned llama.cpp with:
+
+```sh
+python tools/salmon-model/scripts/generate_converter_matrix.py
+```
+
+Python is not needed to build or run `salmon-model`; this script is only a source-generation check. Tests compare the generated matrix with the pinned converter when the submodule is present.
+
 ## Target hardware and filtering
 
 The UI accepts a session-level deployment target: system RAM, optional VRAM, maximum model download size, and CPU-first or GPU-assisted mode. This is intentionally editable because the developer's workstation may not represent players' machines. The browser's coarse memory report is only an initial hint and is never silently treated as a shipping requirement.

@@ -142,15 +142,15 @@ function remoteRow(result) {
   metadata.append(
     make("span", "", result.pipeline || "Task not declared"),
     make("span", result.plan.license === "unknown" ? "license-unknown" : "", `License: ${result.plan.license}`),
-    make("span", "", `${result.plan.gguf_files.length} GGUF file${result.plan.gguf_files.length === 1 ? "" : "s"}`),
+    make("span", "", result.plan.gguf_files.length ? `${result.plan.gguf_files.length} GGUF file${result.plan.gguf_files.length === 1 ? "" : "s"}` : result.plan.classification.replaceAll("_", " ")),
     make("span", "", `${formatCount(result.downloads)} downloads`),
     make("span", "", `${formatCount(result.likes)} likes`)
   );
   const fitting = (result.plan.gguf_files || []).filter(file => fitFor(file).className !== "exceeds").length;
-  metadata.append(make("span", fitting ? "validation-state" : "license-unknown", fitting ? `${fitting} file${fitting === 1 ? "" : "s"} within target` : "No files within target"));
+  if (result.plan.gguf_files.length) metadata.append(make("span", fitting ? "validation-state" : "license-unknown", fitting ? `${fitting} file${fitting === 1 ? "" : "s"} within target` : "No files within target"));
   main.append(metadata);
   const actions = make("div", "model-actions");
-  const inspectButton = make("button", "secondary", "View files");
+  const inspectButton = make("button", "secondary", result.plan.gguf_files.length ? "View files" : "Inspect options");
   inspectButton.addEventListener("click", () => inspect(result.repository));
   actions.append(inspectButton);
   row.append(main, actions);
@@ -296,7 +296,64 @@ function renderDetails(data) {
     row.append(installButton);
     files.append(row);
   });
+  if (!data.plan.gguf_files.length) files.append(renderPreparation(data));
   content.append(files);
+}
+
+function renderPreparation(data) {
+  const prep = data.plan.preparation, section = make("section", "preparation");
+  section.append(make("h3", "", "Model preparation"));
+  if (!prep) { section.append(make("div", "empty small", "No preparation assessment is available.")); return section; }
+  const status = make("div", "preparation-status");
+  status.append(make("strong", "", prep.status.replaceAll("_", " ")), make("p", "", prep.explanation));
+  section.append(status);
+  const facts = make("dl", "facts compact");
+  [
+    ["Architectures", prep.architectures?.join(", ") || "Not declared"],
+    ["Source format", prep.source_format || "Not detected"],
+    ["Source weights", prep.source_weight_bytes ? formatBytes(prep.source_weight_bytes) : "Unknown"],
+    ["Pinned llama.cpp", shortHash(prep.converter_llama_commit)]
+  ].forEach(([label, value]) => facts.append(make("dt", "", label), make("dd", "", value)));
+  section.append(facts);
+  if (prep.missing_requirements?.length) section.append(make("div", "warning", `Missing: ${prep.missing_requirements.join("; ")}.`));
+  (prep.warnings || []).forEach(warning => section.append(make("div", "warning", warning)));
+  if (prep.required_source_files?.length) {
+    section.append(make("h4", "", "Required source files"));
+    const sourceList = make("div", "source-files");
+    prep.required_source_files.forEach(file => sourceList.append(
+      make("span", "mono", file.name), make("span", "", file.role),
+      make("span", "", file.size_bytes ? formatBytes(file.size_bytes) : "Size unknown"),
+      make("span", file.sha256 ? "validation-state" : "license-unknown", file.sha256 ? "SHA-256 declared" : (file.role === "weights" ? "Hash missing" : "Immutable revision"))
+    ));
+    section.append(sourceList);
+  }
+  if (prep.output_estimates?.length) {
+    section.append(make("h4", "", "Approximate output and peak disk"));
+    const estimates = make("div", "estimate-list");
+    prep.output_estimates.forEach(estimate => {
+      const projected = fitFor({ size_bytes: estimate.maximum_bytes });
+      estimates.append(
+        make("strong", "", estimate.preset),
+        make("span", "", `${formatBytes(estimate.minimum_bytes)}–${formatBytes(estimate.maximum_bytes)} output`),
+        make("span", "", `${formatBytes(estimate.peak_disk_minimum_bytes)}–${formatBytes(estimate.peak_disk_maximum_bytes)} peak disk`),
+        make("span", `fit ${projected.className}`, `${projected.label} after preparation`)
+      );
+    });
+    section.append(estimates, make("p", "fine-print", prep.output_estimates[0].warning));
+  }
+  const actions = make("div", "preparation-actions");
+  (prep.actions || []).forEach(action => {
+    const button = make("button", action.id === "prepare" ? "primary" : "", action.label);
+    button.type = "button"; button.disabled = !action.available; button.title = action.explanation;
+    if (action.id === "find_gguf") button.addEventListener("click", () => {
+      activateView("hub"); $("#query").value = `${data.repository} GGUF`; $("#format").value = "gguf";
+      $("#search-form").requestSubmit(); closeDialog("details-dialog");
+    });
+    if (action.id === "import_gguf") button.addEventListener("click", () => showToast("Choose an existing GGUF through SaLMon's Godot filesystem model selector. Companion-library import is not implemented yet."));
+    actions.append(button);
+  });
+  section.append(actions, make("p", "fine-print", "Conversion remains unavailable until the separate pinned and consented toolchain is installed. SaLMon never runs repository code."));
+  return section;
 }
 
 let pendingPlan = null, currentJob = null, pollTimer = null;
