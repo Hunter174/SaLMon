@@ -4,7 +4,7 @@ This is an implementation preview, not a certified game-distribution release.
 
 ## Locally exercised
 
-Windows x86_64, MinGW GCC 13.1, CMake, portable CPU build, Godot 4.5.1 stable official:
+Windows x86_64, MinGW GCC 13.1 and MSVC 19.44, CMake, portable/native CPU builds, Godot 4.5.1 stable official:
 
 - Extension built from source with llama.cpp `bf78f5439ee8e82e367674043303ebf8e92b4805` and godot-cpp `d502d8e8aae35248bad69b9f40b98150ab694774`.
 - Updated the parent llama.cpp gitlink to the tested revision. Preserved pre-existing local submodule edits outside the commit.
@@ -19,7 +19,8 @@ Windows x86_64, MinGW GCC 13.1, CMake, portable CPU build, Godot 4.5.1 stable of
 - Interactive `tests/godot/main.tscn` assembled with separate chat, semantic, and embeddings scenes; headless run with Qwen3 + MiniLM passes. Qwen weights remain ignored and are documented in `tests/models/README.md`.
 - Real-model native smoke: local all-MiniLM-L6-v2-Q4_K_M GGUF — 384-dimensional normalized, repeatable embeddings.
 - Headless Godot script: registration, errors, real chat/decision/embedding calls, stream/final equality, unload errors, queued-load destruction, compatibility class registration.
-- Windows dependency inspection: generated CPU DLL imports ADVAPI32.dll, KERNEL32.dll and msvcrt.dll; no external MinGW runtime DLLs.
+- Windows dependency inspection: generated MinGW CPU DLL imports ADVAPI32.dll, KERNEL32.dll and msvcrt.dll; no external MinGW runtime DLLs.
+- Clean MSVC x64 Release build and CTest pass. All native/runtime/godot-cpp targets use the same static MSVC CRT; this fixes the mixed `/MD`/`/MT` linker failure first exposed by the GitHub Windows matrix.
 
 Test models were supplied locally for validation. No weights were committed or added to release artifacts. Smoke tests are structural/correctness checks, **not decision accuracy, quality or performance benchmarks**. The small chat model selected the wrong answer on a sample decision; do not use that model's smoke-test pass as a recommendation for gameplay decisions.
 
@@ -59,7 +60,7 @@ Record any import failure independently; it invalidates clean-import certificati
 ## Not yet verified
 
 - Linux/macOS builds (CI matrix added but not run from this checkout)
-- Windows MSVC build and clean-machine installation
+- Windows clean-machine installation (MSVC build itself is verified)
 - Godot 4.4 and other engine/bindings combinations
 - GPU compilation/runtime, device selection/fallback, memory pressure
 - Exported games and clean installs

@@ -7,6 +7,13 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# godot-cpp defaults to a static MSVC CRT. Set it before creating llama.cpp and
+# runtime targets so every library passed to the extension linker uses /MT.
+# Consumers may still override this cache entry explicitly at configure time.
+if(MSVC AND NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING
+        "MSVC runtime shared by SaLMoN, llama.cpp, and godot-cpp")
+endif()
 
 option(SALMON_BUILD_EXTENSION "Build the Godot extension" ON)
 option(SALMON_VULKAN "Compile the Vulkan backend" OFF)
