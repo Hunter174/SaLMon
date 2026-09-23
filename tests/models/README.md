@@ -48,6 +48,14 @@ addons/salmon/models/all-MiniLM-L6-v2-Q4_K_M.gguf
 - SHA-256: `2ec4cee28a27a9c973d5f5230930d6ef6e52694bd2bc71be26a9bef5b1d755e6`
 - Approximate size: 20 MB
 
+Validate its semantic geometry against canonical FP32 MiniLM fixtures:
+
+```sh
+build/native/salmon_embedding_reference addons/salmon/models/all-MiniLM-L6-v2-Q4_K_M.gguf
+```
+
+The local Q4 model measured a maximum cosine-matrix delta of `0.021439` and mean off-diagonal delta of `0.011113` against `sentence-transformers/all-MiniLM-L6-v2` revision `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`.
+
 ## Run
 
 Build the extension, copy the generated `addons/` directory into `tests/godot/`, and run `tests/godot/main.tscn`. The project defaults to these paths, or accepts absolute overrides:

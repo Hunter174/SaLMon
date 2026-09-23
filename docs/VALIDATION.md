@@ -20,6 +20,7 @@ Windows x86_64, MinGW GCC 13.1 and MSVC 19.44, CMake, portable/native CPU builds
   - Averaging logits across all four cyclic option positions produced 7/8 fixture accuracy for both quantizations and removes position dependence by construction, but cost about 2.60 s (Q4) or 2.95 s (Q8) per four-option decision. It still chose the wrong reaction for the threat fixture.
 - Interactive `tests/godot/main.tscn` assembled with separate chat, semantic, and embeddings scenes; headless run with Qwen3 + MiniLM passes. Qwen weights remain ignored and are documented in `tests/models/README.md`.
 - Real-model native smoke: local all-MiniLM-L6-v2-Q4_K_M GGUF — 384-dimensional normalized, repeatable embeddings.
+- Embedding reference agreement (`salmon_embedding_reference`): six fixed texts compared against normalized FP32 mean-pooled `sentence-transformers/all-MiniLM-L6-v2` revision `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`. The Q4 GGUF cosine matrix had 0.021439 maximum and 0.011113 mean off-diagonal delta, passing the documented 0.08 tolerance. Loading Qwen3 as an embedding model was rejected because it lacks supported sequence pooling.
 - Headless Godot script: registration, errors, real chat/decision/embedding calls, stream/final equality, unload errors, queued-load destruction, compatibility class registration.
 - Windows dependency inspection: generated MinGW CPU DLL imports ADVAPI32.dll, KERNEL32.dll and msvcrt.dll; no external MinGW runtime DLLs.
 - Clean MSVC x64 Release build and CTest pass. All native/runtime/godot-cpp targets use the same static MSVC CRT; this fixes the mixed `/MD`/`/MT` linker failure first exposed by the GitHub Windows matrix.
@@ -49,6 +50,12 @@ build/dev/salmon_semantic_benchmark path/to/model.gguf [path/to/second-model.ggu
 ```
 
 This reports accuracy, margin, latency, and option-order stability without imposing a universal pass threshold.
+
+Compare a local MiniLM GGUF against the committed canonical cosine fixtures:
+
+```sh
+build/dev/salmon_embedding_reference path/to/all-MiniLM-L6-v2.gguf
+```
 
 For Godot, copy `tests/godot/project.godot` and `tests/godot/smoke.gd` into a temporary project and copy the **freshly built** `build/dev/addon/addons/` directory into it. With multi-config generators, move the generated DLL from the `bin/Release/` subdirectory to `bin/` first.
 

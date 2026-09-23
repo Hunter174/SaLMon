@@ -117,4 +117,6 @@ if(BUILD_TESTING)
     # registered with CTest. Run it explicitly against candidate GGUF files.
     add_executable(salmon_semantic_benchmark tests/semantic_benchmark.cpp)
     target_link_libraries(salmon_semantic_benchmark PRIVATE salmon_runtime)
+    add_executable(salmon_embedding_reference tests/embedding_reference.cpp)
+    target_link_libraries(salmon_embedding_reference PRIVATE salmon_runtime)
 endif()
