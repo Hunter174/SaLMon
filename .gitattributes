@@ -1,0 +1,2 @@
+# Go tooling requires canonical formatting on every CI platform.
+tools/salmon-model/** text eol=lf
