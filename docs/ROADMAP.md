@@ -51,18 +51,18 @@ Implement items 1–5 and configurable CPU/GPU build foundations first. Keep dow
 
 ## Issue re-evaluation
 
-- Review-ready after commit: runtime lifecycle (#2) and chat consolidation (#3).
-- Core implemented but acceptance validation remains: hygiene (#1), semantic quality fixtures (#4), embedding reference agreement (#5), and the interactive project (#12).
+- Completed on `main`: hygiene/runtime separation (#1), runtime lifecycle (#2), chat consolidation (#3), and the interactive project (#12).
+- Core implemented but acceptance validation remains: semantic quality fixtures (#4) and embedding reference agreement (#5).
 - Partial: CPU performance (#6), GPU foundations (#8), and release engineering (#9).
 - Backlog: verified model delivery (#7), ONNX evaluation (#10), and agent/NPC extensions (#13–#16).
 - Blocked: clean Windows Godot import (#11).
 
-Do not close implementation issues until the working tree is committed and clean-checkout CI confirms the corresponding code. “Mechanically implemented” is not equivalent to model-quality or release certification.
+“Mechanically implemented” is not equivalent to model-quality or release certification.
 
-## Working-tree progress
+## Current progress
 
-- Implemented initial hygiene/runtime/chat/decision/embedding paths (#1–#5), with native and real-model smoke tests. Not yet committed or released.
+- Committed hygiene/runtime/chat plus the initial decision and embedding paths in `2b9eb98`, with native and real-model smoke tests. Issues #1–#3 are complete; model-quality/reference validation keeps #4–#5 open.
 - Added CPU configuration, separate generation/batch thread controls, Qwen3 no-thinking support, optional native/AVX2 builds, and example-level embedding index caching. Reproducible p50/p95 benchmarks, runtime prefix reuse, true cross-text batching, device discovery, and GPU fallback remain (#6/#8).
 - Added deployment/migration documentation, source-built desktop CI preview artifacts, and an interactive three-domain Godot showcase (#12). No built-in downloader or production certification yet (#7/#9).
-- Preserved the existing modified tracked DLL and uncompiled embedding prototype; development output is isolated under the build directory.
-- See `VALIDATION.md` for tested hardware/models, limitations and the first-import blocker. Issues remain open until their acceptance criteria are met and changes are reviewed.
+- Preserved the pre-existing modified tracked DLL and uncompiled embedding prototype outside the commit; ordinary development output is isolated under the build directory, with an explicit opt-in target for staging the Godot demo.
+- A fresh recursive checkout successfully completed a portable Release build, CTest, explicit Godot staging, and model-free headless smoke test. See `VALIDATION.md` for tested hardware/models, limitations, and the first-import blocker.

@@ -7,7 +7,7 @@ This is an implementation preview, not a certified game-distribution release.
 Windows x86_64, MinGW GCC 13.1, CMake, portable CPU build, Godot 4.5.1 stable official:
 
 - Extension built from source with llama.cpp `bf78f5439ee8e82e367674043303ebf8e92b4805` and godot-cpp `d502d8e8aae35248bad69b9f40b98150ab694774`.
-- The parent llama.cpp gitlink was stale while local Git settings hid submodule differences. Updated the gitlink to the tested revision (staged, not committed). Preserved the pre-existing local submodule edits.
+- Updated the parent llama.cpp gitlink to the tested revision. Preserved pre-existing local submodule edits outside the commit.
 - Rebuilt native runtime/tests from a **clean git archive** of that llama.cpp revision using `SALMON_LLAMA_SOURCE_DIR`; native tests and both real-model smokes pass without the local patch. CMake supplies the narrow MinGW thread-API compatibility workaround instead of editing dependency sources.
 - Native CTest suite: conditional softmax and invalid inputs; option validation; UTF-8 chunk boundaries; FIFO delivery; stream preservation; worker exceptions; active/queued cancellation; backpressure; outstanding request retirement; active-worker destruction; invalid model files and handles.
 - Real-model native smoke: local SmolLM2-135M-Instruct GGUF — chat, stream equality, repeated-request context isolation, decision-score shape/normalization.
@@ -17,7 +17,7 @@ Windows x86_64, MinGW GCC 13.1, CMake, portable CPU build, Godot 4.5.1 stable of
 - Headless Godot script: registration, errors, real chat/decision/embedding calls, stream/final equality, unload errors, queued-load destruction, compatibility class registration.
 - Windows dependency inspection: generated CPU DLL imports ADVAPI32.dll, KERNEL32.dll and msvcrt.dll; no external MinGW runtime DLLs.
 
-The test models were already available locally. No weights were downloaded or added to the release artifacts. Smoke tests are structural/correctness checks, **not decision accuracy, quality or performance benchmarks**. The small chat model selected the wrong answer on a sample decision; do not use that model's smoke-test pass as a recommendation for gameplay decisions.
+Test models were supplied locally for validation. No weights were committed or added to release artifacts. Smoke tests are structural/correctness checks, **not decision accuracy, quality or performance benchmarks**. The small chat model selected the wrong answer on a sample decision; do not use that model's smoke-test pass as a recommendation for gameplay decisions.
 
 ## Known failure: first editor import
 
@@ -57,3 +57,5 @@ Record any import failure independently; it invalidates clean-import certificati
 - Long-context, large-output and stress/sanitizer testing
 
 The GitHub workflow uploads model-free CPU **preview artifacts** after native tests. It deliberately does not publish releases or imply that native tests replace Godot/export validation.
+
+Commit `2b9eb98` was additionally verified from a fresh recursive worktree: portable MinGW Release configure/build, CTest, explicit `salmon_stage_godot_test`, and model-free Godot 4.5.1 headless smoke all passed.
