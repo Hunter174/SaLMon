@@ -33,13 +33,24 @@ Discovery listings are never cached by SaLMon. Persistence is limited to user-cr
 
 Commands emit a versioned JSON document. Long-running state-changing commands will emit JSON Lines progress events. This protocol is intended for terminals and a future editor frontend without linking the companion into the extension.
 
-The initial commands are read-only:
+Discovery commands are read-only:
 
 ```text
 salmon-model search --query TEXT [--format any|gguf] [--limit N]
 salmon-model inspect [--revision REV] OWNER/REPOSITORY
 salmon-model plan [--revision REV] OWNER/REPOSITORY
 ```
+
+Direct installation uses two-phase consent:
+
+```text
+salmon-model install-plan --file FILE [--revision REV] OWNER/REPOSITORY
+salmon-model install --file FILE --consent DIGEST [--revision REV] OWNER/REPOSITORY
+salmon-model list
+salmon-model remove --id INSTALLATION_ID
+```
+
+The digest binds the resolved commit, exact repository file, reported size, content SHA-256, license, and destination. Installation refuses files without a Hub-reported SHA-256, applies a configurable size limit, streams to a same-store temporary file, verifies size/hash and the GGUF header, then atomically promotes it. Structural validation is not represented as successful llama.cpp runtime validation.
 
 ## Security decisions
 

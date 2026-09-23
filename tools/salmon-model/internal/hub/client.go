@@ -30,6 +30,8 @@ type SearchOptions struct {
 	Limit  int
 }
 
+type ProgressFunc func(completed, total int64)
+
 type Model struct {
 	ID           string          `json:"id"`
 	SHA          string          `json:"sha"`
@@ -157,6 +159,85 @@ func repositoryParts(repository string) (string, string, error) {
 		return "", "", errors.New("repository must be owner/name using safe Hugging Face characters")
 	}
 	return parts[0], parts[1], nil
+}
+
+func (c *Client) DownloadFile(ctx context.Context, repository, revision, filename string, expectedSize, maximumSize int64, destination io.Writer, progress ProgressFunc) error {
+	owner, name, err := repositoryParts(repository)
+	if err != nil {
+		return err
+	}
+	if revision == "" || len(revision) > 200 || strings.ContainsAny(revision, "?#") {
+		return errors.New("invalid resolved revision")
+	}
+	if filename == "" || len(filename) > 1000 || strings.Contains(filename, "\\") {
+		return errors.New("invalid repository filename")
+	}
+	segments := strings.Split(filename, "/")
+	for index, segment := range segments {
+		if segment == "" || segment == "." || segment == ".." {
+			return errors.New("invalid repository filename")
+		}
+		segments[index] = url.PathEscape(segment)
+	}
+	address := c.endpoint + "/" + url.PathEscape(owner) + "/" + url.PathEscape(name) + "/resolve/" + url.PathEscape(revision) + "/" + strings.Join(segments, "/")
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("User-Agent", "salmon-model/0.1 (+https://github.com/Hunter174/SaLMon)")
+	client := *c.http
+	client.CheckRedirect = func(request *http.Request, via []*http.Request) error {
+		if request.URL.Scheme != "https" && request.URL.Hostname() != "127.0.0.1" && request.URL.Hostname() != "localhost" {
+			return errors.New("download redirect must use HTTPS")
+		}
+		if len(via) >= 10 {
+			return errors.New("too many download redirects")
+		}
+		return nil
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("Hugging Face download failed: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+		return fmt.Errorf("Hugging Face download returned HTTP %d", response.StatusCode)
+	}
+	if expectedSize <= 0 || maximumSize <= 0 || expectedSize > maximumSize {
+		return errors.New("download size is missing or exceeds the configured limit")
+	}
+	if response.ContentLength > 0 && response.ContentLength != expectedSize {
+		return fmt.Errorf("download Content-Length %d does not match planned size %d", response.ContentLength, expectedSize)
+	}
+	reader := io.LimitReader(response.Body, maximumSize+1)
+	buffer := make([]byte, 256*1024)
+	var completed int64
+	for {
+		count, readErr := reader.Read(buffer)
+		if count > 0 {
+			completed += int64(count)
+			if completed > maximumSize {
+				return errors.New("download exceeded configured size limit")
+			}
+			if _, err := destination.Write(buffer[:count]); err != nil {
+				return fmt.Errorf("write download: %w", err)
+			}
+			if progress != nil {
+				progress(completed, expectedSize)
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return fmt.Errorf("read download: %w", readErr)
+		}
+	}
+	if completed != expectedSize {
+		return fmt.Errorf("downloaded size %d does not match planned size %d", completed, expectedSize)
+	}
+	return nil
 }
 
 func (c *Client) getJSON(ctx context.Context, address string, destination any) error {

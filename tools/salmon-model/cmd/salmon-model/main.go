@@ -7,10 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
 )
 
@@ -39,7 +41,9 @@ type modelSummary struct {
 }
 
 func main() {
-	if err := run(context.Background(), os.Args[1:]); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	if err := run(ctx, os.Args[1:]); err != nil {
 		writeJSON(os.Stderr, map[string]any{"schema_version": 1, "error": err.Error()})
 		os.Exit(1)
 	}
@@ -117,16 +121,105 @@ func run(ctx context.Context, arguments []string) error {
 			"plan":        plan,
 			"persistence": "Repository metadata was fetched live and was not stored by salmon-model.",
 		})
+	case "install-plan":
+		flags := flag.NewFlagSet("install-plan", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		revision := flags.String("revision", "main", "branch, tag, or commit")
+		filename := flags.String("file", "", "exact GGUF repository filename")
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 1 || *filename == "" {
+			return errors.New("install-plan requires --file and one owner/repository argument")
+		}
+		model, err := client.Inspect(ctx, flags.Arg(0), *revision)
+		if err != nil {
+			return err
+		}
+		plan, err := install.BuildPlan(model, *filename, *root)
+		if err != nil {
+			return err
+		}
+		return output("install-plan", plan)
+	case "install":
+		flags := flag.NewFlagSet("install", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		revision := flags.String("revision", "main", "branch, tag, or commit")
+		filename := flags.String("file", "", "exact GGUF repository filename")
+		root := flags.String("root", "", "managed storage root")
+		consent := flags.String("consent", "", "digest from the exact install-plan")
+		maximumBytes := flags.Int64("max-bytes", install.DefaultMaximumBytes, "hard download size limit")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 1 || *filename == "" || *consent == "" {
+			return errors.New("install requires --file, --consent, and one owner/repository argument")
+		}
+		model, err := client.Inspect(ctx, flags.Arg(0), *revision)
+		if err != nil {
+			return err
+		}
+		plan, err := install.BuildPlan(model, *filename, *root)
+		if err != nil {
+			return err
+		}
+		var lastReported int64
+		record, err := install.Execute(ctx, client, plan, *consent, *root, *maximumBytes, func(completed, total int64) {
+			if completed-lastReported >= 16<<20 || completed == total {
+				_ = writeJSON(os.Stderr, map[string]any{"schema_version": 1, "event": "download_progress", "completed_bytes": completed, "total_bytes": total})
+				lastReported = completed
+			}
+		})
+		if err != nil {
+			return err
+		}
+		return outputWithSource("install", "hugging-face-live-api-and-local-storage", record)
+	case "remove":
+		flags := flag.NewFlagSet("remove", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		id := flags.String("id", "", "installed model ID from salmon-model list")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 || *id == "" {
+			return errors.New("remove requires --id and accepts no positional arguments")
+		}
+		record, err := install.Remove(*root, *id)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("remove", "local-installation-registry", map[string]any{"removed": record})
+	case "list":
+		flags := flag.NewFlagSet("list", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return errors.New("list accepts flags only")
+		}
+		records, err := install.List(*root)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("list", "local-installation-registry", map[string]any{"models": records})
 	case "version", "--version", "-version":
-		return output("version", map[string]any{"version": version})
+		return outputWithSource("version", "local", map[string]any{"version": version})
 	default:
 		return usageError()
 	}
 }
 
 func output(command string, data any) error {
+	return outputWithSource(command, "hugging-face-live-api", data)
+}
+
+func outputWithSource(command, source string, data any) error {
 	return writeJSON(os.Stdout, envelope{
-		SchemaVersion: 1, Command: command, Source: "hugging-face-live-api",
+		SchemaVersion: 1, Command: command, Source: source,
 		FetchedAt: time.Now().UTC().Format(time.RFC3339), Data: data,
 	})
 }
@@ -166,7 +259,11 @@ func ggufParameters(model hub.Model) int64 {
 func usageError() error {
 	return errors.New(strings.TrimSpace(`usage:
   salmon-model search --query TEXT [--format any|gguf] [--limit 20]
-  salmon-model inspect OWNER/REPOSITORY [--revision main]
-  salmon-model plan OWNER/REPOSITORY [--revision main]
+  salmon-model inspect [--revision main] OWNER/REPOSITORY
+  salmon-model plan [--revision main] OWNER/REPOSITORY
+  salmon-model install-plan --file FILE [--revision main] [--root PATH] OWNER/REPOSITORY
+  salmon-model install --file FILE --consent DIGEST [--revision main] [--root PATH] OWNER/REPOSITORY
+  salmon-model list [--root PATH]
+  salmon-model remove --id INSTALLATION_ID [--root PATH]
   salmon-model version`))
 }

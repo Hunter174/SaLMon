@@ -56,9 +56,9 @@ Implement items 1–5 and configurable CPU/GPU build foundations first. Keep dow
 
 - Completed on `main`: hygiene/runtime separation (#1), runtime lifecycle (#2), chat consolidation (#3), embedding correctness/reference agreement (#5), and the interactive project (#12).
 - Core implemented but acceptance validation remains: semantic quality and option-order robustness (#4).
-- Partial: CPU performance (#6), GPU foundations (#8), and release engineering (#9).
+- Partial: CPU performance (#6), verified direct-GGUF delivery through the separate companion (#7), GPU foundations (#8), and release engineering (#9).
 - Backlog: verified model delivery (#7), ONNX evaluation (#10), agent/NPC extensions (#13–#16), and the state-changing conversion/toolchain portions of #18.
-- Started: separate `salmon-model` companion foundations for live, non-persisted Hugging Face discovery (#17) and discovery-to-preparation planning (#19); it is not linked or packaged with the Godot addon.
+- Started: separate `salmon-model` companion foundations for live, non-persisted Hugging Face discovery (#17) and discovery-to-preparation planning (#19); it is not linked or packaged with the Godot addon. Exact-plan consent, bounded verified GGUF installation, structural validation, listing, and removal are implemented; full llama.cpp probing and conversion toolchains remain.
 - Blocked: clean Windows Godot import (#11).
 
 “Mechanically implemented” is not equivalent to model-quality or release certification.
