@@ -40,10 +40,15 @@ struct Request {
 };
 struct Result {
     std::string text, choice_id, model_path, purpose, finish_reason;
+    std::string model_name, architecture, model_description, pooling;
+    uint64_t model_bytes = 0, parameters = 0;
+    int training_context = 0, embedding_dimensions = 0;
+    bool has_chat_template = false;
     std::vector<std::string> option_ids;
     std::vector<float> logits, scores;
     std::vector<std::vector<float>> embeddings;
-    double elapsed_ms = 0;
+    int prompt_tokens = 0, generated_tokens = 0;
+    double elapsed_ms = 0, prompt_ms = 0, generation_ms = 0, time_to_first_token_ms = 0;
 };
 struct Event {
     enum class Kind { Token, Completed, Failed };

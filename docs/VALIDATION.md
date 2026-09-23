@@ -12,6 +12,7 @@ Windows x86_64, MinGW GCC 13.1 and MSVC 19.44, CMake, portable/native CPU builds
 - Native CTest suite: conditional softmax and invalid inputs; option validation; UTF-8 chunk boundaries; FIFO delivery; stream preservation; worker exceptions; active/queued cancellation; backpressure; outstanding request retirement; active-worker destruction; invalid model files and handles.
 - Real-model native smoke: local SmolLM2-135M-Instruct GGUF — chat, stream equality, repeated-request context isolation, decision-score shape/normalization.
 - Real-model native smoke: local Qwen3-0.6B Q4_K_M GGUF — chat, stream equality, repeated-request context isolation, and decision-score shape/normalization.
+- Extensible performance harness (`salmon_performance_benchmark`): external JSON model/workload manifests; llama.cpp capability metadata; explicit unsupported-operation skips; cold load/first inference; warm p50/p90/p95; prompt throughput; chat time-to-first-token and generation throughput. The initial local v1 run exercised Qwen3 chat/decision and MiniLM embeddings from one manifest. See `docs/BENCHMARKING.md`.
 - Initial semantic fixture report (`salmon_semantic_benchmark`) on the native-tuned i7-10750H build:
   - Qwen3-0.6B Q4_K_M: 13/16 expected choices (81.2%), 5/8 option-order stability (62.5%), 761 ms mean per trial.
   - Qwen3-0.6B Q8_0: 14/16 expected choices (87.5%), 6/8 option-order stability (75.0%), 809 ms mean per trial.

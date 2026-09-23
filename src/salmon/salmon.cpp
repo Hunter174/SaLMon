@@ -151,7 +151,23 @@ void Salmon::_process(double) {
             result["operation"] = operation_name(event.operation); result["model"] = event.model;
             result["model_path"] = gd(event.result.model_path); result["purpose"] = gd(event.result.purpose);
             result["elapsed_ms"] = event.result.elapsed_ms;
+            if (event.operation == salmon::Operation::Load) {
+                result["model_name"] = gd(event.result.model_name);
+                result["architecture"] = gd(event.result.architecture);
+                result["model_description"] = gd(event.result.model_description);
+                result["model_bytes"] = static_cast<int64_t>(event.result.model_bytes);
+                result["parameters"] = static_cast<int64_t>(event.result.parameters);
+                result["training_context"] = event.result.training_context;
+                result["embedding_dimensions"] = event.result.embedding_dimensions;
+                result["has_chat_template"] = event.result.has_chat_template;
+                result["pooling"] = gd(event.result.pooling);
+            }
+            result["prompt_tokens"] = event.result.prompt_tokens;
+            result["prompt_ms"] = event.result.prompt_ms;
             if (event.operation == salmon::Operation::Chat) {
+                result["generated_tokens"] = event.result.generated_tokens;
+                result["generation_ms"] = event.result.generation_ms;
+                result["time_to_first_token_ms"] = event.result.time_to_first_token_ms;
                 result["text"] = gd(event.result.text); result["finish_reason"] = gd(event.result.finish_reason);
             } else if (event.operation == salmon::Operation::Decide) {
                 result["choice_id"] = gd(event.result.choice_id);

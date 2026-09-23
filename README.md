@@ -141,7 +141,7 @@ The node must be in a processing scene tree to drain results. During pause, sign
 
 ## Deployment and migration
 
-See [deployment](docs/DEPLOYMENT.md), [migration](docs/MIGRATION.md), and [implementation backlog](docs/ROADMAP.md).
+See [deployment](docs/DEPLOYMENT.md), [migration](docs/MIGRATION.md), [local GGUF benchmarking](docs/BENCHMARKING.md), and the [implementation backlog](docs/ROADMAP.md).
 
 Bundled, pre-downloaded, and user-supplied local files work. A verified opt-in model download manager is planned, not implemented. Never embed multi-GB weights in the native library.
 

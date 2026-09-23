@@ -2,6 +2,7 @@
 #include "llama.h"
 #include "ggml-backend.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <limits>
@@ -85,6 +86,25 @@ void prefill(Session &session, std::vector<llama_token> &tokens, std::atomic_boo
         check_cancel(cancelled);
         if (status != 0) throw std::runtime_error("Prompt decode failed (code " + std::to_string(status) + ")");
     }
+}
+std::string model_string(const llama_model *model, const char *key) {
+    const int size = llama_model_meta_val_str(model, key, nullptr, 0);
+    if (size <= 0) return {};
+    std::vector<char> buffer(size + 1);
+    const int written = llama_model_meta_val_str(model, key, buffer.data(), buffer.size());
+    return written > 0 ? std::string(buffer.data(), written) : std::string{};
+}
+std::string model_description(const llama_model *model) {
+    std::vector<char> buffer(256);
+    const int written = llama_model_desc(model, buffer.data(), buffer.size());
+    return written > 0 ? std::string(buffer.data(), std::min<size_t>(written, buffer.size() - 1)) : std::string{};
+}
+std::string pooling_name(enum llama_pooling_type pooling) {
+    if (pooling == LLAMA_POOLING_TYPE_MEAN) return "mean";
+    if (pooling == LLAMA_POOLING_TYPE_CLS) return "cls";
+    if (pooling == LLAMA_POOLING_TYPE_LAST) return "last";
+    if (pooling == LLAMA_POOLING_TYPE_RANK) return "rank";
+    return "unsupported";
 }
 std::string token_piece(const llama_vocab *vocab, llama_token token) {
     std::vector<char> buffer(64);
@@ -173,6 +193,15 @@ private:
                 throw std::invalid_argument("Embedding model requires mean, CLS, or last sequence pooling");
         }
         Result result; result.model_path = session.path; result.purpose = session.purpose;
+        result.model_name = model_string(session.model.get(), "general.name");
+        result.architecture = model_string(session.model.get(), "general.architecture");
+        result.model_description = model_description(session.model.get());
+        result.model_bytes = llama_model_size(session.model.get());
+        result.parameters = llama_model_n_params(session.model.get());
+        result.training_context = llama_model_n_ctx_train(session.model.get());
+        result.embedding_dimensions = llama_model_n_embd(session.model.get());
+        result.has_chat_template = llama_model_chat_template(session.model.get(), nullptr) != nullptr;
+        result.pooling = pooling_name(llama_pooling_type(session.context.get()));
         if (!sessions_.emplace(request.model, std::move(session)).second) throw std::invalid_argument("Model handle already loaded");
         return result;
     }
@@ -182,7 +211,11 @@ private:
         auto tokens = tokenize(vocab, format_chat(session, request.messages));
         if (tokens.size() + request.max_tokens > llama_n_ctx(session.context.get()))
             throw std::invalid_argument("Prompt plus requested output exceeds context capacity");
+        result.prompt_tokens = static_cast<int>(tokens.size());
+        const auto prompt_start = std::chrono::steady_clock::now();
         prefill(session, tokens, cancelled);
+        const auto generation_start = std::chrono::steady_clock::now();
+        result.prompt_ms = std::chrono::duration<double, std::milli>(generation_start - prompt_start).count();
         std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)> sampler(llama_sampler_init_greedy(), llama_sampler_free);
         if (!sampler) throw std::runtime_error("Sampler allocation failed");
         std::string pending;
@@ -191,6 +224,10 @@ private:
             check_cancel(cancelled);
             llama_token token = llama_sampler_sample(sampler.get(), session.context.get(), -1);
             if (llama_vocab_is_eog(vocab, token)) { result.finish_reason = "stop"; break; }
+            if (result.generated_tokens == 0)
+                result.time_to_first_token_ms = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - prompt_start).count();
+            ++result.generated_tokens;
             pending += token_piece(vocab, token);
             const size_t length = utf8_prefix_length(pending);
             if (length) {
@@ -211,6 +248,8 @@ private:
             result.text += "\xef\xbf\xbd";
             if (request.stream) stream("\xef\xbf\xbd");
         }
+        result.generation_ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - generation_start).count();
     }
     void decide(Session &session, const Request &request, std::atomic_bool &cancelled, Result &result) {
         validate_options(request.options);
@@ -222,6 +261,7 @@ private:
         const auto prompt = format_chat(session, {{"user", content}});
         const auto *vocab = llama_model_get_vocab(session.model.get());
         auto tokens = tokenize(vocab, prompt);
+        result.prompt_tokens = static_cast<int>(tokens.size());
         std::vector<llama_token> labels;
         std::unordered_set<llama_token> distinct;
         for (size_t i = 0; i < request.options.size(); ++i) {
@@ -232,7 +272,10 @@ private:
                 throw std::runtime_error("Option labels are not distinct single-token continuations for this template/tokenizer");
             labels.push_back(candidate.back()); result.option_ids.push_back(request.options[i].id);
         }
+        const auto prompt_start = std::chrono::steady_clock::now();
         prefill(session, tokens, cancelled);
+        result.prompt_ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - prompt_start).count();
         const float *logits = llama_get_logits_ith(session.context.get(), -1);
         if (!logits) throw std::runtime_error("Model returned no logits");
         for (auto token : labels) result.logits.push_back(logits[token]);

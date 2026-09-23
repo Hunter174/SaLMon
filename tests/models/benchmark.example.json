@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "build_profile": "native",
+  "cold_runs": 1,
+  "warmups": 1,
+  "runs": 5,
+  "models": [
+    {
+      "id": "qwen3-0.6b-q4",
+      "path": "${SALMON_MODEL_DIR}/Qwen3-0.6B-Q4_K_M.gguf",
+      "source": "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF",
+      "revision": "main",
+      "sha256": "ac2d97712095a558e31573f62f466a3f9d93990898b0ec79d7c974c1780d524a",
+      "purposes": ["chat", "decision"],
+      "settings": {
+        "context": 2048,
+        "batch": 256,
+        "threads": 4,
+        "threads_batch": 8,
+        "gpu_layers": 0,
+        "mmap": true
+      }
+    },
+    {
+      "id": "minilm-l6-v2-q4",
+      "path": "../../addons/salmon/models/all-MiniLM-L6-v2-Q4_K_M.gguf",
+      "source": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+      "purposes": ["embedding"],
+      "settings": {
+        "context": 512,
+        "batch": 512,
+        "threads": 4,
+        "threads_batch": 8,
+        "gpu_layers": 0,
+        "mmap": true
+      }
+    }
+  ],
+  "workloads": {
+    "chat": {
+      "max_tokens": 32,
+      "messages": [
+        {"role": "user", "content": "/no_think\nBriefly describe a quiet forest camp."}
+      ]
+    },
+    "decision": {
+      "state": "The player is injured and has a healing potion.",
+      "question": "Which action best addresses the immediate problem?",
+      "options": [
+        {"id": "heal", "description": "Use the healing potion"},
+        {"id": "attack", "description": "Attack a distant wall"}
+      ]
+    },
+    "embedding": {
+      "texts": [
+        "The harbor is closed during the storm.",
+        "Ships cannot enter because of severe weather.",
+        "The blacksmith sells iron swords."
+      ]
+    }
+  }
+}
