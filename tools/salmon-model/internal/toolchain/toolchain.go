@@ -76,6 +76,7 @@ type Record struct {
 	SourceURL     string `json:"source_url"`
 	Path          string `json:"path"`
 	Binary        string `json:"binary"`
+	BinarySHA256  string `json:"binary_sha256"`
 	InstalledAt   string `json:"installed_at"`
 	Validation    string `json:"validation"`
 }
@@ -198,6 +199,10 @@ func Execute(ctx context.Context, plan Plan, consent, root string, maximumBytes 
 	if err := dependencies.Probe(ctx, stagedBinary); err != nil {
 		return Record{}, fmt.Errorf("toolchain executable probe failed: %w", err)
 	}
+	binaryHash, err := hashFile(stagedBinary)
+	if err != nil {
+		return Record{}, fmt.Errorf("hash toolchain executable: %w", err)
+	}
 	if err := os.MkdirAll(filepath.Dir(plan.Destination), 0o755); err != nil {
 		return Record{}, err
 	}
@@ -208,7 +213,7 @@ func Execute(ctx context.Context, plan Plan, consent, root string, maximumBytes 
 		SchemaVersion: 1, ID: recordID(plan), ToolchainID: ToolchainID, Version: Version,
 		OS: plan.OS, Arch: plan.Arch, Archive: plan.Archive, SizeBytes: plan.SizeBytes,
 		SHA256: strings.ToLower(plan.SHA256), SourceURL: plan.SourceURL, Path: plan.Destination,
-		Binary: plan.Binary, InstalledAt: time.Now().UTC().Format(time.RFC3339), Validation: "quantize-help-probe-passed",
+		Binary: plan.Binary, BinarySHA256: binaryHash, InstalledAt: time.Now().UTC().Format(time.RFC3339), Validation: "quantize-help-probe-passed",
 	}
 	if err := writeRecord(root, record); err != nil {
 		_ = os.RemoveAll(plan.Destination)
@@ -274,6 +279,28 @@ func Probe(ctx context.Context, binary string) error {
 	// b6002 exits non-zero after printing usage. Content validation is authoritative here.
 	_ = err
 	return nil
+}
+
+func Resolve(ctx context.Context, root string) (Record, error) {
+	plan, err := BuildPlan(root)
+	if err != nil {
+		return Record{}, err
+	}
+	root, err = resolvedRoot(root)
+	if err != nil {
+		return Record{}, err
+	}
+	record, found, err := readRecord(root, recordID(plan))
+	if err != nil {
+		return Record{}, err
+	}
+	if !found {
+		return Record{}, errors.New("llama-quantize toolchain is not installed; run toolchain-plan and toolchain-install first")
+	}
+	if err := validateExisting(record, plan, Probe, ctx); err != nil {
+		return Record{}, err
+	}
+	return record, nil
 }
 
 func List(root string) ([]Record, error) {
@@ -372,8 +399,15 @@ func validatePlan(plan Plan, root string) (Artifact, error) {
 }
 
 func validateExisting(record Record, plan Plan, probe ProbeFunc, ctx context.Context) error {
-	if record.ID != recordID(plan) || record.SHA256 != strings.ToLower(plan.SHA256) || filepath.Clean(record.Path) != filepath.Clean(plan.Destination) || filepath.Clean(record.Binary) != filepath.Clean(plan.Binary) {
+	if record.ID != recordID(plan) || record.SHA256 != strings.ToLower(plan.SHA256) || filepath.Clean(record.Path) != filepath.Clean(plan.Destination) || filepath.Clean(record.Binary) != filepath.Clean(plan.Binary) || len(record.BinarySHA256) != 64 {
 		return errors.New("installed toolchain registry record conflicts with the requested plan")
+	}
+	binaryHash, err := hashFile(record.Binary)
+	if err != nil {
+		return fmt.Errorf("hash installed toolchain executable: %w", err)
+	}
+	if !strings.EqualFold(binaryHash, record.BinarySHA256) {
+		return errors.New("installed toolchain executable hash does not match its registry record")
 	}
 	if err := probe(ctx, record.Binary); err != nil {
 		return fmt.Errorf("installed toolchain is corrupt or unusable: %w", err)
@@ -528,6 +562,19 @@ func (writer *countingWriter) Write(data []byte) (int, error) {
 		writer.progress(writer.written, writer.total)
 	}
 	return count, err
+}
+
+func hashFile(filename string) (string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func truncate(value string, maximum int) string {

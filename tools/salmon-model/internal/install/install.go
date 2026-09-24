@@ -57,6 +57,20 @@ type Record struct {
 	InstalledAt          string `json:"installed_at"`
 	StructuralValidation string `json:"structural_validation"`
 	RuntimeValidation    string `json:"runtime_validation"`
+	Origin               string `json:"origin,omitempty"`
+	DerivedFromSHA256    string `json:"derived_from_sha256,omitempty"`
+	PreparationPreset    string `json:"preparation_preset,omitempty"`
+	PreparationToolchain string `json:"preparation_toolchain,omitempty"`
+}
+
+type GeneratedMetadata struct {
+	Filename             string
+	SHA256               string
+	SizeBytes            int64
+	DerivedFromSHA256    string
+	PreparationPreset    string
+	PreparationToolchain string
+	Source               *Record
 }
 
 type ProgressFunc func(completed, total int64)
@@ -335,6 +349,83 @@ func Remove(root, id string) (Record, error) {
 	restore = false
 	return record, nil
 }
+
+func RegisterGenerated(root, filename string, metadata GeneratedMetadata) (Record, error) {
+	var err error
+	if root == "" {
+		root, err = DefaultRoot()
+		if err != nil {
+			return Record{}, err
+		}
+	}
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return Record{}, err
+	}
+	if len(metadata.SHA256) != 64 || len(metadata.DerivedFromSHA256) != 64 || metadata.SizeBytes <= 0 {
+		return Record{}, errors.New("generated model metadata is incomplete")
+	}
+	localName := safeBaseName(metadata.Filename)
+	expectedPath := filepath.Join(root, "models", "sha256", strings.ToLower(metadata.SHA256), localName)
+	if filepath.Clean(filename) != filepath.Clean(expectedPath) {
+		return Record{}, errors.New("generated model path differs from managed content-addressed storage")
+	}
+	info, err := os.Stat(expectedPath)
+	if err != nil {
+		return Record{}, err
+	}
+	if !info.Mode().IsRegular() || info.Size() != metadata.SizeBytes {
+		return Record{}, errors.New("generated model size or file type is invalid")
+	}
+	if err := validateGGUF(expectedPath); err != nil {
+		return Record{}, err
+	}
+	actualHash, err := hashFile(expectedPath)
+	if err != nil {
+		return Record{}, err
+	}
+	if !strings.EqualFold(actualHash, metadata.SHA256) {
+		return Record{}, errors.New("generated model hash changed before registration")
+	}
+	record := Record{
+		SchemaVersion: 1, Repository: "local/generated", ResolvedSHA: metadata.DerivedFromSHA256,
+		Filename: localName, SizeBytes: metadata.SizeBytes, SHA256: strings.ToLower(metadata.SHA256),
+		License: "unknown", SourceURL: "", Path: expectedPath, InstalledAt: time.Now().UTC().Format(time.RFC3339),
+		StructuralValidation: "gguf-header-passed-after-quantization", RuntimeValidation: "not-run",
+		Origin: "quantized", DerivedFromSHA256: strings.ToLower(metadata.DerivedFromSHA256),
+		PreparationPreset: metadata.PreparationPreset, PreparationToolchain: metadata.PreparationToolchain,
+	}
+	if metadata.Source != nil {
+		record.Repository = metadata.Source.Repository
+		record.ResolvedSHA = metadata.Source.ResolvedSHA
+		record.License = metadata.Source.License
+		record.LicenseURL = metadata.Source.LicenseURL
+		record.BaseModel = metadata.Source.BaseModel
+		record.SourceURL = metadata.Source.SourceURL
+	}
+	idHash := sha256.Sum256([]byte("generated\n" + record.SHA256 + "\n" + record.Filename))
+	record.ID = hex.EncodeToString(idHash[:16])
+	if err := writeRecord(root, record); err != nil {
+		return Record{}, err
+	}
+	return record, nil
+}
+
+func FindBySHA256(root, digest string) (*Record, error) {
+	records, err := List(root)
+	if err != nil {
+		return nil, err
+	}
+	for index := range records {
+		if strings.EqualFold(records[index].SHA256, digest) {
+			return &records[index], nil
+		}
+	}
+	return nil, nil
+}
+
+func HashFile(filename string) (string, error) { return hashFile(filename) }
+func ValidateGGUF(filename string) error       { return validateGGUF(filename) }
 
 func writeRecord(root string, record Record) error {
 	directory := filepath.Join(root, "registry")

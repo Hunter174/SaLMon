@@ -111,7 +111,16 @@ salmon-model toolchain-list [--root PATH]
 salmon-model toolchain-remove --id TOOLCHAIN_ID [--root PATH]
 ```
 
-The catalog pins official llama.cpp `b6002` archives by platform, exact byte size, SHA-256, and GitHub release URL. Installation accepts only catalog-matching plans, HTTPS downloads and redirects, bounded ZIPs without traversal/symlink/special entries, and a successful `llama-quantize` help probe. Extraction is staged and atomically promoted. Installing the executable does not authorize running it; quantization will use a separate exact execution plan and consent digest.
+The catalog pins official llama.cpp `b6002` archives by platform, exact byte size, SHA-256, and GitHub release URL. Installation accepts only catalog-matching plans, HTTPS downloads and redirects, bounded ZIPs without traversal/symlink/special entries, and a successful `llama-quantize` help probe. Extraction is staged and atomically promoted. The extracted executable SHA-256 is recorded and rechecked before use.
+
+Installing the executable does not authorize running it. Quantization has a separate exact execution plan and consent digest:
+
+```text
+salmon-model quantize-plan --input FILE --preset Q4_K_M|Q5_K_M|Q8_0 [--name FILE] [--root PATH]
+salmon-model quantize --input FILE --preset PRESET --consent DIGEST [--name FILE] [--root PATH]
+```
+
+The plan binds the input's absolute path, size, and SHA-256; output name and managed destination pattern; preset; rough output and peak-disk estimates; and toolchain archive, executable path, and executable hash. Execution regenerates the plan, refuses unlisted presets and implicit requantization, monitors its output-size limit, supports process cancellation, and suppresses verbose model metadata while reporting throttled tensor progress. SaLMon checks the generated GGUF header, hashes it, re-hashes the source to catch mutation during execution, atomically promotes it into content-addressed model storage, and registers inherited provenance when the source was already managed. This is structural post-quantization validation; runtime inference validation remains explicitly `not-run`.
 
 ## Project manifest
 
@@ -136,4 +145,4 @@ Creating a manifest does not export or copy weights. A later build-staging comma
 
 A direct GGUF candidate proceeds to the verified installation workflow from #7. A non-GGUF source remains preparation-only until its architecture and required files match the pinned llama.cpp converter's support matrix. Conversion and quantization are delegated to opt-in toolchains managed by the companion, never the GDExtension.
 
-The small `llama-quantize` acquisition path is now implemented independently of the future Python converter environment. It does not yet execute quantization. The next step is an exact `quantize-plan` / `quantize` contract that binds input hash, output destination, preset, executable identity, disk estimate, and cancellation behavior before process launch.
+The small `llama-quantize` acquisition and consented quantization paths are implemented independently of the future Python converter environment. The remaining preparation work is source-model conversion through an isolated pinned Python environment, followed by the same quantization and managed-registration path.

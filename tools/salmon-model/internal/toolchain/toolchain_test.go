@@ -119,6 +119,12 @@ func TestVerifiedAtomicInstallListIdempotenceAndRemove(t *testing.T) {
 	if err != nil || len(records) != 1 || records[0].ID != record.ID {
 		t.Fatalf("unexpected records: %#v, %v", records, err)
 	}
+	if err := os.WriteFile(record.Binary, []byte("tampered quantizer"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Execute(context.Background(), plan, plan.ConsentDigest, root, 1<<20, nil, dependencies(archive, nil)); err == nil || !strings.Contains(err.Error(), "executable hash") {
+		t.Fatalf("tampered installed executable was accepted: %v", err)
+	}
 	removed, err := Remove(root, record.ID)
 	if err != nil || removed.ID != record.ID {
 		t.Fatalf("remove failed: %#v, %v", removed, err)

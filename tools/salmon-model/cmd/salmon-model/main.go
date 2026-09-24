@@ -14,6 +14,7 @@ import (
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/quantize"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/toolchain"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/webui"
 )
@@ -219,6 +220,50 @@ func run(ctx context.Context, arguments []string) error {
 			return err
 		}
 		return outputWithSource("list", "local-installation-registry", map[string]any{"models": records})
+	case "quantize-plan":
+		flags := flag.NewFlagSet("quantize-plan", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		input := flags.String("input", "", "local F16, BF16, or F32 GGUF input")
+		preset := flags.String("preset", "", "Q4_K_M, Q5_K_M, or Q8_0")
+		name := flags.String("name", "", "optional managed output filename")
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 || *input == "" || *preset == "" {
+			return errors.New("quantize-plan requires --input and --preset and accepts no positional arguments")
+		}
+		plan, err := quantize.BuildPlan(ctx, *input, *preset, *name, *root, quantize.Dependencies{})
+		if err != nil {
+			return err
+		}
+		return outputWithSource("quantize-plan", "local-input-and-pinned-toolchain", plan)
+	case "quantize":
+		flags := flag.NewFlagSet("quantize", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		input := flags.String("input", "", "local F16, BF16, or F32 GGUF input")
+		preset := flags.String("preset", "", "Q4_K_M, Q5_K_M, or Q8_0")
+		name := flags.String("name", "", "optional managed output filename")
+		root := flags.String("root", "", "managed storage root")
+		consent := flags.String("consent", "", "digest from the exact quantize-plan")
+		maximumBytes := flags.Int64("max-bytes", quantize.DefaultMaximumOutputBytes, "hard generated-output size limit")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 || *input == "" || *preset == "" || *consent == "" {
+			return errors.New("quantize requires --input, --preset, and --consent and accepts no positional arguments")
+		}
+		plan, err := quantize.BuildPlan(ctx, *input, *preset, *name, *root, quantize.Dependencies{})
+		if err != nil {
+			return err
+		}
+		record, err := quantize.Execute(ctx, plan, *consent, *root, *maximumBytes, func(message string) {
+			_ = writeJSON(os.Stderr, map[string]any{"schema_version": 1, "event": "quantize_progress", "message": message})
+		}, quantize.Dependencies{})
+		if err != nil {
+			return err
+		}
+		return outputWithSource("quantize", "local-pinned-toolchain-and-managed-storage", record)
 	case "toolchain-plan":
 		flags := flag.NewFlagSet("toolchain-plan", flag.ContinueOnError)
 		flags.SetOutput(os.Stderr)
@@ -352,6 +397,8 @@ func usageError() error {
   salmon-model install --file FILE --consent DIGEST [--revision main] [--root PATH] OWNER/REPOSITORY
   salmon-model list [--root PATH]
   salmon-model remove --id INSTALLATION_ID [--root PATH]
+  salmon-model quantize-plan --input FILE --preset Q4_K_M|Q5_K_M|Q8_0 [--name FILE] [--root PATH]
+  salmon-model quantize --input FILE --preset PRESET --consent DIGEST [--name FILE] [--root PATH]
   salmon-model toolchain-plan [--root PATH]
   salmon-model toolchain-install --consent DIGEST [--root PATH]
   salmon-model toolchain-list [--root PATH]
