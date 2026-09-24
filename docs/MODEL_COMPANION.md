@@ -71,7 +71,7 @@ Discovery listings—including live inventories from recommended sources—are n
 - Minimal provenance and validation records required to list, select, verify, and remove those files.
 - Optional pinned preparation toolchains installed with explicit consent.
 
-The first preparation toolchain is stored under `toolchains/llama-quantize/b6002/<os>-<arch>/`, with its separate registry under `toolchains/registry/`. Temporary archives use the existing `downloads/` directory and are removed on success, cancellation, or failure.
+The quantizer is stored under `toolchains/llama-quantize/b6002/<os>-<arch>/`, with its registry under `toolchains/registry/`. The larger isolated converter environment is stored under `toolchains/llama-convert-hf/bf78f543-python3.11-v1/<os>-<arch>/`, with records under `toolchains/conversion-registry/`. Temporary archives and dependency caches use managed staging/download directories and are removed on success, cancellation, or failure.
 
 ## User interfaces
 
@@ -101,6 +101,17 @@ salmon-model remove --id INSTALLATION_ID
 ```
 
 The digest binds the resolved commit, exact repository file, reported size, content SHA-256, license, and destination. Installation refuses files without a Hub-reported SHA-256, applies a configurable size limit, streams to a same-store temporary file, verifies size/hash and the GGUF header, then atomically promotes it. Structural validation is not represented as successful llama.cpp runtime validation.
+
+The isolated conversion environment has an independent, larger consent boundary:
+
+```text
+salmon-model conversion-toolchain-plan [--root PATH]
+salmon-model conversion-toolchain-install --consent DIGEST [--root PATH]
+salmon-model conversion-toolchain-list [--root PATH]
+salmon-model conversion-toolchain-remove --id TOOLCHAIN_ID [--root PATH]
+```
+
+Its platform-specific plan pins and displays standalone `uv` 0.7.12, Python 3.11.13 from python-build-standalone release 20250712, llama.cpp source commit `bf78f5439ee8e82e367674043303ebf8e92b4805`, each bootstrap archive's exact size and SHA-256, the dependency-lock SHA-256 and 27 exact package versions, a dependency-download allowance, and a conservative installed-size estimate. Installation accepts only binary wheels matching the embedded lock hashes, forces CPU-only PyTorch, disables Python auto-downloads and user site packages, confines caches and temporary files to staging, and applies a consented working-size bound. It retains the converter, `gguf-py`, and upstream licenses but does not install into system Python. A successful install must import NumPy, SentencePiece, Transformers, Torch, Protobuf, and the pinned local `gguf`, then execute converter help offline. The installed package tree, Python executable, and converter script are hashed and rechecked before reuse. Installation still does not authorize a model download or conversion run.
 
 Optional quantizer-toolchain acquisition has its own consent boundary:
 
@@ -137,7 +148,9 @@ Creating a manifest does not export or copy weights. A later build-staging comma
 - No `trust_remote_code` behavior is permitted.
 - Download and preparation commands require explicit consent.
 - Model and toolchain installation use temporary files, mandatory SHA-256 verification, bounded validation, and atomic promotion.
-- Toolchain ZIP extraction rejects path traversal, backslash paths, absolute paths, symlinks, special files, excessive entry counts, and excessive expanded size.
+- Quantizer ZIP extraction rejects path traversal, backslash paths, absolute paths, symlinks, special files, excessive entry counts, and excessive expanded size.
+- Conversion-environment ZIP/tar extraction rejects traversal and special entries; required Python symlinks are accepted only when their relative target remains inside staging.
+- Conversion dependencies are exact-version, hash-locked binary wheels; automatic Python acquisition, source distributions, user-site packages, and arbitrary model-repository code are disabled.
 - The browser POC listens only on loopback, uses a random port and per-launch authorization token, checks mutation origins, and exposes no arbitrary URL-fetch endpoint.
 - Missing hashes and licenses are shown as warnings, never silently treated as trusted.
 
@@ -145,4 +158,4 @@ Creating a manifest does not export or copy weights. A later build-staging comma
 
 A direct GGUF candidate proceeds to the verified installation workflow from #7. A non-GGUF source remains preparation-only until its architecture and required files match the pinned llama.cpp converter's support matrix. Conversion and quantization are delegated to opt-in toolchains managed by the companion, never the GDExtension.
 
-The small `llama-quantize` acquisition and consented quantization paths are implemented independently of the future Python converter environment. The remaining preparation work is source-model conversion through an isolated pinned Python environment, followed by the same quantization and managed-registration path.
+The small `llama-quantize` acquisition and consented quantization paths remain independent from the much larger Python converter environment. The isolated environment can now be planned, installed, verified, inventoried, and removed. It does not yet download source repositories or run conversion; those operations require a separate exact `convert-plan` / `convert` contract before feeding generated GGUFs into the existing quantization and managed-registration path.

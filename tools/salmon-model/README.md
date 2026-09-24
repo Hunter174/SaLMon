@@ -24,6 +24,10 @@ salmon-model toolchain-plan
 salmon-model toolchain-install --consent CONSENT_DIGEST
 salmon-model toolchain-list
 salmon-model toolchain-remove --id llama-quantize-b6002-OS-ARCH
+salmon-model conversion-toolchain-plan
+salmon-model conversion-toolchain-install --consent CONSENT_DIGEST
+salmon-model conversion-toolchain-list
+salmon-model conversion-toolchain-remove --id TOOLCHAIN_ID
 salmon-model quantize-plan --input model-f16.gguf --preset Q4_K_M
 salmon-model quantize --input model-f16.gguf --preset Q4_K_M --consent CONSENT_DIGEST
 ```
@@ -36,7 +40,9 @@ For non-GGUF repositories, inspection compares declared architectures with a gen
 
 Installation performs structural validation only and records runtime validation as `not-run`.
 
-`toolchain-plan` selects an exact pinned llama.cpp `b6002` release archive for Windows x64, Linux x64, macOS x64, or macOS arm64. The plan binds platform, archive, byte size, SHA-256, upstream URL, and user-level destination into a consent digest. `toolchain-install` downloads only after that consent, enforces HTTPS and size bounds, verifies SHA-256, rejects unsafe ZIP paths, extracts through a staging directory, probes `llama-quantize --help`, and atomically registers the result. Toolchain installation does **not** authorize execution against a model. `quantize-plan` separately binds the input path, size and SHA-256; output name and managed destination pattern; preset; size/disk estimates; and archive plus executable identities. `quantize` regenerates that plan, requires its exact consent digest, refuses implicit requantization, emits throttled progress, supports cancellation, bounds and structurally validates the generated GGUF, verifies that the input did not change during execution, and atomically registers the content-addressed output in the normal model registry. Runtime inference validation remains `not-run`, and source-model conversion is not implemented yet.
+`toolchain-plan` selects an exact pinned llama.cpp `b6002` release archive for Windows x64, Linux x64, macOS x64, or macOS arm64. The plan binds platform, archive, byte size, SHA-256, upstream URL, and user-level destination into a consent digest. `toolchain-install` downloads only after that consent, enforces HTTPS and size bounds, verifies SHA-256, rejects unsafe ZIP paths, extracts through a staging directory, probes `llama-quantize --help`, and atomically registers the result. The larger conversion environment is independently optional. `conversion-toolchain-plan` pins standalone `uv` 0.7.12, Python 3.11.13 from python-build-standalone release 20250712, llama.cpp converter source commit `bf78f5439ee8e82e367674043303ebf8e92b4805`, and a platform-specific SHA-256 dependency lock using CPU-only PyTorch. The consent plan lists all bootstrap artifacts, exact hashes and sizes, 27 locked packages, a dependency-download allowance, and a conservative installed-size estimate. Installation verifies each bootstrap artifact, safely extracts it, installs only hash-locked binary wheels into a user-level virtual environment, bounds temporary and installed storage, probes imports plus converter help, and atomically registers the isolated environment. It never modifies system Python and does not authorize source downloads or conversion execution.
+
+Quantizer installation does **not** authorize execution against a model. `quantize-plan` separately binds the input path, size and SHA-256; output name and managed destination pattern; preset; size/disk estimates; and archive plus executable identities. `quantize` regenerates that plan, requires its exact consent digest, refuses implicit requantization, emits throttled progress, supports cancellation, bounds and structurally validates the generated GGUF, verifies that the input did not change during execution, and atomically registers the content-addressed output in the normal model registry. Runtime inference validation remains `not-run`, and source-model conversion is not implemented yet.
 
 ## Development
 

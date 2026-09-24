@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/conversionenv"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
@@ -220,6 +221,81 @@ func run(ctx context.Context, arguments []string) error {
 			return err
 		}
 		return outputWithSource("list", "local-installation-registry", map[string]any{"models": records})
+	case "conversion-toolchain-plan":
+		flags := flag.NewFlagSet("conversion-toolchain-plan", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return errors.New("conversion-toolchain-plan accepts flags only")
+		}
+		plan, err := conversionenv.BuildPlan(*root)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("conversion-toolchain-plan", "pinned-local-catalog-and-embedded-lock", plan)
+	case "conversion-toolchain-install":
+		flags := flag.NewFlagSet("conversion-toolchain-install", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		consent := flags.String("consent", "", "digest from the exact conversion-toolchain-plan")
+		maximumBytes := flags.Int64("max-component-bytes", conversionenv.DefaultMaximumComponentBytes, "hard size limit for each pinned bootstrap artifact")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 || *consent == "" {
+			return errors.New("conversion-toolchain-install requires --consent and accepts no positional arguments")
+		}
+		plan, err := conversionenv.BuildPlan(*root)
+		if err != nil {
+			return err
+		}
+		lastReported := map[string]int64{}
+		record, err := conversionenv.Execute(ctx, plan, *consent, *root, *maximumBytes, func(stage, message string, completed, total int64) {
+			key := stage + "\n" + message
+			if stage == "download" && completed != 0 && completed != total && completed-lastReported[key] < 8<<20 {
+				return
+			}
+			lastReported[key] = completed
+			_ = writeJSON(os.Stderr, map[string]any{"schema_version": 1, "event": "conversion_toolchain_progress", "stage": stage, "message": message, "completed_bytes": completed, "total_bytes": total})
+		}, conversionenv.Dependencies{})
+		if err != nil {
+			return err
+		}
+		return outputWithSource("conversion-toolchain-install", "verified-upstream-artifacts-locked-dependencies-and-local-storage", record)
+	case "conversion-toolchain-list":
+		flags := flag.NewFlagSet("conversion-toolchain-list", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 {
+			return errors.New("conversion-toolchain-list accepts flags only")
+		}
+		records, err := conversionenv.List(*root)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("conversion-toolchain-list", "local-conversion-toolchain-registry", map[string]any{"toolchains": records})
+	case "conversion-toolchain-remove":
+		flags := flag.NewFlagSet("conversion-toolchain-remove", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		root := flags.String("root", "", "managed storage root")
+		id := flags.String("id", "", "installed conversion toolchain ID")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 0 || *id == "" {
+			return errors.New("conversion-toolchain-remove requires --id and accepts no positional arguments")
+		}
+		record, err := conversionenv.Remove(*root, *id)
+		if err != nil {
+			return err
+		}
+		return outputWithSource("conversion-toolchain-remove", "local-conversion-toolchain-registry", map[string]any{"removed": record})
 	case "quantize-plan":
 		flags := flag.NewFlagSet("quantize-plan", flag.ContinueOnError)
 		flags.SetOutput(os.Stderr)
@@ -397,6 +473,10 @@ func usageError() error {
   salmon-model install --file FILE --consent DIGEST [--revision main] [--root PATH] OWNER/REPOSITORY
   salmon-model list [--root PATH]
   salmon-model remove --id INSTALLATION_ID [--root PATH]
+  salmon-model conversion-toolchain-plan [--root PATH]
+  salmon-model conversion-toolchain-install --consent DIGEST [--root PATH]
+  salmon-model conversion-toolchain-list [--root PATH]
+  salmon-model conversion-toolchain-remove --id TOOLCHAIN_ID [--root PATH]
   salmon-model quantize-plan --input FILE --preset Q4_K_M|Q5_K_M|Q8_0 [--name FILE] [--root PATH]
   salmon-model quantize --input FILE --preset PRESET --consent DIGEST [--name FILE] [--root PATH]
   salmon-model toolchain-plan [--root PATH]
