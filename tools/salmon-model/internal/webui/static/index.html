@@ -7,6 +7,7 @@
   <title>SaLMon Models</title>
   <link rel="stylesheet" href="/static/style.css">
   <script defer src="/static/app.js"></script>
+  <script defer src="/static/preparation.js"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -65,7 +66,7 @@
     <section id="local" class="view">
       <header class="page-header">
         <div><h1>Local models</h1><p>GGUF files explicitly installed and verified by the companion.</p></div>
-        <button id="refresh-installed" class="secondary">Refresh</button>
+        <div class="model-actions"><button id="install-quantizer" class="secondary">Quantizer toolchain</button><button id="refresh-installed" class="secondary">Refresh</button></div>
       </header>
       <div class="storage-bar"><div><span>Storage location</span><code id="storage-root">—</code></div><strong id="storage-summary">—</strong></div>
       <div id="installed-status" class="status-text" aria-live="polite"></div>
@@ -114,6 +115,16 @@
     <div id="install-progress" class="progress-area hidden"><progress max="100" value="0"></progress><p></p></div>
     <div id="install-error" class="error" aria-live="assertive"></div>
     <div class="dialog-actions"><button class="secondary" data-close>Cancel</button><button id="confirm-install" class="primary" disabled>Download and verify</button><button id="cancel-download" class="danger hidden">Cancel download</button></div>
+  </dialog>
+
+  <dialog id="preparation-dialog">
+    <div class="dialog-header"><div><span class="kicker">Optional local preparation</span><h2 id="preparation-title">Review plan</h2></div><button class="close" data-close aria-label="Close">×</button></div>
+    <div id="preparation-options" class="dialog-body hidden"></div>
+    <div id="preparation-summary" class="dialog-body"></div>
+    <label class="consent"><input id="preparation-consent" type="checkbox"><span>I reviewed this exact operation, download sizes, source and license, output, toolchain, and destination. I authorize this operation only.</span></label>
+    <div id="preparation-progress" class="progress-area hidden"><progress max="100" value="0"></progress><p></p></div>
+    <div id="preparation-error" class="error" aria-live="assertive"></div>
+    <div class="dialog-actions"><button class="secondary" data-close>Close</button><button id="confirm-preparation" class="primary" disabled>Run this operation</button><button id="cancel-preparation" class="danger hidden">Cancel operation</button></div>
   </dialog>
 
   <dialog id="assign-dialog">

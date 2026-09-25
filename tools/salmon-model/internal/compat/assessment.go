@@ -147,7 +147,7 @@ func Assess(model hub.Model) Assessment {
 	if projectorSupported {
 		assessment.Warnings = append(assessment.Warnings, "The pinned converter recognizes a multimodal projector, but SaLMon's current runtime API is text and embeddings only.")
 	}
-	convertAction := Action{ID: "prepare", Label: "Convert and quantize", Available: false}
+	convertAction := Action{ID: "prepare", Label: "Convert source", Available: false}
 	switch {
 	case len(assessment.Architectures) == 0:
 		assessment.Status = "unknown_architecture"
@@ -167,7 +167,7 @@ func Assess(model hub.Model) Assessment {
 		if hasPyTorch && !hasSafeTensors {
 			assessment.Explanation = "The architecture is recognized, but PyTorch-only preparation remains disabled pending the isolated toolchain policy."
 		}
-		convertAction.Explanation = "Install and consent to the optional pinned toolchain from issue #18 when it becomes available."
+		convertAction.Explanation = "Install the optional pinned converter environment, then review a separate exact conversion plan; quantization requires a further separate plan."
 		assessment.OutputEstimates = estimates(assessment.SourceWeightBytes)
 	}
 	assessment.Actions = append(assessment.Actions, convertAction)

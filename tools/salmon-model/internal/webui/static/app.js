@@ -18,6 +18,10 @@ const formatBytes = value => {
 };
 const formatCount = value => new Intl.NumberFormat(undefined, { notation: "compact" }).format(value || 0);
 const shortHash = value => value ? `${value.slice(0, 10)}…` : "Unavailable";
+function showToast(message) {
+  const status = $("#details-dialog").open ? $("#details-status") : $("#installed-status");
+  status.textContent = message;
+}
 const GiB = 1024 * 1024 * 1024;
 const detectedRAM = Number(navigator.deviceMemory || 0);
 let targetProfile = { ramGB: detectedRAM || 8, vramGB: 0, maxDownloadGB: 4, mode: "cpu" };
@@ -342,8 +346,8 @@ function renderPreparation(data) {
     section.append(estimates, make("p", "fine-print", prep.output_estimates[0].warning));
   }
   const actions = make("div", "preparation-actions");
-  (prep.actions || []).forEach(action => {
-    const button = make("button", action.id === "prepare" ? "primary" : "", action.label);
+  (prep.actions || []).filter(action => action.id !== "prepare").forEach(action => {
+    const button = make("button", "secondary", action.label);
     button.type = "button"; button.disabled = !action.available; button.title = action.explanation;
     if (action.id === "find_gguf") button.addEventListener("click", () => {
       activateView("hub"); $("#query").value = `${data.repository} GGUF`; $("#format").value = "gguf";
@@ -352,7 +356,14 @@ function renderPreparation(data) {
     if (action.id === "import_gguf") button.addEventListener("click", () => showToast("Choose an existing GGUF through SaLMon's Godot filesystem model selector. Companion-library import is not implemented yet."));
     actions.append(button);
   });
-  section.append(actions, make("p", "fine-print", "Conversion remains unavailable until the separate pinned and consented toolchain is installed. SaLMon never runs repository code."));
+  if (prep.status === "conversion_toolchain_required" && prep.source_format === "safetensors") {
+    const installTool = make("button", "secondary", "Install conversion toolchain");
+    installTool.addEventListener("click", () => openPreparation("conversion-toolchain", {}));
+    const convertButton = make("button", "primary", "Convert source to GGUF");
+    convertButton.addEventListener("click", () => openPreparation("convert", { repository: data.repository, revision: data.resolved_sha, outtype: "f16" }));
+    actions.append(installTool, convertButton);
+  }
+  section.append(actions, make("p", "fine-print", "Find GGUF searches live. Convert source requires a separately consented pinned environment and execution plan; quantization is a later, separately consented operation. PyTorch-only sources and repository code are not executed."));
   return section;
 }
 
@@ -483,7 +494,13 @@ function localRow(record) {
   assign.addEventListener("click", () => openAssignment(record));
   const remove = make("button", "danger", "Remove");
   remove.addEventListener("click", () => removeInstalled(record));
-  actions.append(assign, remove);
+  actions.append(assign);
+  if (record.origin !== "quantized") {
+    const quantizeButton = make("button", "secondary", "Quantize GGUF");
+    quantizeButton.addEventListener("click", () => openPreparation("quantize", { installation_id: record.id, preset: "Q4_K_M" }));
+    actions.append(quantizeButton);
+  }
+  actions.append(remove);
   row.append(main, actions);
   return row;
 }

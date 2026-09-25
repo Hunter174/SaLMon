@@ -36,15 +36,16 @@ type Options struct {
 }
 
 type Server struct {
-	client *hub.Client
-	token  string
-	origin string
-	root   string
-	ctx    context.Context
-	mu     sync.Mutex
-	plans  map[string]storedPlan
-	jobs   map[string]*Job
-	cancel context.CancelFunc
+	client           *hub.Client
+	token            string
+	origin           string
+	root             string
+	ctx              context.Context
+	mu               sync.Mutex
+	plans            map[string]storedPlan
+	preparationPlans map[string]storedPreparation
+	jobs             map[string]*Job
+	cancel           context.CancelFunc
 }
 
 type storedPlan struct {
@@ -58,6 +59,9 @@ type Job struct {
 	CompletedBytes int64           `json:"completed_bytes"`
 	TotalBytes     int64           `json:"total_bytes"`
 	Record         *install.Record `json:"record,omitempty"`
+	Toolchain      any             `json:"toolchain,omitempty"`
+	Stage          string          `json:"stage,omitempty"`
+	Message        string          `json:"message,omitempty"`
 	Error          string          `json:"error,omitempty"`
 	cancel         context.CancelFunc
 }
@@ -102,7 +106,7 @@ func Run(ctx context.Context, client *hub.Client, options Options) error {
 		return err
 	}
 	runCtx, cancel := context.WithCancel(ctx)
-	server := &Server{client: client, token: token, root: root, ctx: runCtx, plans: map[string]storedPlan{}, jobs: map[string]*Job{}, cancel: cancel}
+	server := &Server{client: client, token: token, root: root, ctx: runCtx, plans: map[string]storedPlan{}, preparationPlans: map[string]storedPreparation{}, jobs: map[string]*Job{}, cancel: cancel}
 	server.origin = "http://" + listener.Addr().String()
 	httpServer := &http.Server{
 		Handler: server.routes(), ReadHeaderTimeout: 5 * time.Second,
@@ -143,6 +147,9 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/providers/{id}/models", s.providerModels)
 	mux.HandleFunc("GET /api/search", s.search)
 	mux.HandleFunc("GET /api/inspect", s.inspect)
+	mux.HandleFunc("POST /api/preparation/{kind}/plan", s.preparationPlan)
+	mux.HandleFunc("POST /api/preparation/{kind}/run", s.startPreparation)
+	mux.HandleFunc("GET /api/preparation/toolchains", s.preparationToolchains)
 	mux.HandleFunc("POST /api/install-plan", s.installPlan)
 	mux.HandleFunc("POST /api/install", s.startInstall)
 	mux.HandleFunc("GET /api/jobs/{id}", s.job)

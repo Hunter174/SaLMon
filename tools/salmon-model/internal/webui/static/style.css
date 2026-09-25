@@ -143,6 +143,9 @@ dialog.sheet { width: min(780px, calc(100% - 28px)); }
 .review { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 9px 13px; margin: 0; }
 .review dt { color: var(--muted); }
 .review dd { margin: 0; overflow-wrap: anywhere; }
+#preparation-dialog .review dd { white-space: pre-line; }
+#preparation-options label { display: flex; align-items: center; gap: 12px; }
+#preparation-options select { max-width: 160px; }
 .consent { display: flex; gap: 10px; margin: 0 21px 18px; padding: 12px; background: var(--surface-muted); border-radius: 6px; }
 .progress-area { padding: 0 21px 18px; }
 progress { width: 100%; accent-color: var(--accent); }
