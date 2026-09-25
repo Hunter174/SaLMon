@@ -17,7 +17,38 @@ const formatBytes = value => {
   return `${size.toFixed(unit ? 1 : 0)} ${units[unit]}`;
 };
 const formatCount = value => new Intl.NumberFormat(undefined, { notation: "compact" }).format(value || 0);
-const shortHash = value => value ? `${value.slice(0, 10)}…` : "Unavailable";
+const shortHash = value => value ? `${value.slice(0, 12)}…${value.slice(-8)}` : "Unavailable";
+const compactPath = value => {
+  const parts = String(value).replaceAll("\\", "/").split("/").filter(Boolean);
+  return parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : String(value);
+};
+const technicalLabel = label => /sha-256|digest|commit|destination|source files and verification|input$|inherited source|verified archives|locked dependencies|converter identity/i.test(label);
+function reviewFacts(list, facts) {
+  for (const [label, raw] of facts) {
+    const value = String(raw ?? "Unknown");
+    const term = make("dt", "", label), detail = make("dd");
+    if (technicalLabel(label)) {
+      const digest = /sha-256|digest|commit|converter identity/i.test(label);
+      let preview = digest && /^[a-f0-9]{40,64}$/i.test(value) ? shortHash(value) : compactPath(value);
+      if (label === "Source files and verification" || label === "Verified archives") preview = `${value.split("\n").length} verified file${value.includes("\n") ? "s" : ""}`;
+      if (label === "Locked dependencies") preview = value.split(" · ")[0] + " hash-locked packages";
+      if (label === "Converter identity") preview = value.split(" · ")[0];
+      const row = make("span", "identity-preview", preview);
+      row.title = value;
+      const copy = make("button", "copy-button", "Copy");
+      copy.type = "button"; copy.setAttribute("aria-label", `Copy full ${label}`);
+      copy.addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(value); copy.textContent = "Copied"; setTimeout(() => copy.textContent = "Copy", 1800); }
+        catch { copy.textContent = "Expand details"; }
+      });
+      detail.append(row, copy);
+      const disclosure = make("details", "identity-details");
+      disclosure.append(make("summary", "", "Show full value"), make("code", "", value));
+      detail.append(disclosure);
+    } else detail.textContent = value;
+    list.append(term, detail);
+  }
+}
 function showToast(message) {
   const status = $("#details-dialog").open ? $("#details-status") : $("#installed-status");
   status.textContent = message;
@@ -309,7 +340,14 @@ function renderPreparation(data) {
   section.append(make("h3", "", "Model preparation"));
   if (!prep) { section.append(make("div", "empty small", "No preparation assessment is available.")); return section; }
   const status = make("div", "preparation-status");
-  status.append(make("strong", "", prep.status.replaceAll("_", " ")), make("p", "", prep.explanation));
+  const preparationTitle = {
+    conversion_toolchain_required: "Ready for conversion setup",
+    incomplete_conversion_source: "More source files needed",
+    unsupported_architecture: "This architecture is not supported",
+    unknown_architecture: "Architecture not declared",
+    direct_gguf_available: "GGUF available"
+  }[prep.status] || prep.status.replaceAll("_", " ");
+  status.append(make("strong", "", preparationTitle), make("p", "", prep.explanation));
   section.append(status);
   const facts = make("dl", "facts compact");
   [
@@ -370,6 +408,7 @@ function renderPreparation(data) {
 let pendingPlan = null, currentJob = null, pollTimer = null;
 
 async function prepareInstall(repository, filename, revision = "main") {
+  pendingPlan = null;
   $("#details-dialog").close();
   const dialog = $("#install-dialog");
   $("#install-summary").replaceChildren(make("span", "", "Building an exact installation plan…"));
@@ -381,10 +420,12 @@ async function prepareInstall(repository, filename, revision = "main") {
   $("#install-progress").classList.add("hidden");
   dialog.showModal();
   try {
-    pendingPlan = await api("/api/install-plan", {
+    const plan = await api("/api/install-plan", {
       method: "POST", body: JSON.stringify({ repository, revision, filename })
     });
-    renderInstallPlan(pendingPlan);
+    if (!dialog.open) return;
+    pendingPlan = plan;
+    renderInstallPlan(plan);
   } catch (error) {
     $("#install-error").textContent = error.message;
   }
@@ -392,11 +433,11 @@ async function prepareInstall(repository, filename, revision = "main") {
 
 function renderInstallPlan(plan) {
   const list = make("dl", "review");
-  [
+  reviewFacts(list, [
     ["Repository", plan.repository], ["Commit", plan.resolved_sha], ["File", plan.filename],
     ["Download", formatBytes(plan.size_bytes)], ["Estimated fit", `${fitFor({ size_bytes: plan.size_bytes }).label} (planning estimate)`],
     ["License", plan.license], ["SHA-256", plan.sha256], ["Destination", plan.destination]
-  ].forEach(([label, value]) => list.append(make("dt", "", label), make("dd", "", String(value || "Unknown"))));
+  ]);
   const licenseURL = safeExternalURL(plan.license_url) || safeExternalURL(plan.source_url);
   if (licenseURL) {
     const link = make("a", "", "Review source and license terms ↗");
@@ -445,7 +486,7 @@ async function pollJob() {
     }
     $("#cancel-download").classList.add("hidden");
     if (currentJob.status === "completed") {
-      $("#install-progress p").textContent = `Verified and installed: ${currentJob.record.path}`;
+      $("#install-progress p").textContent = `Verified and installed: ${currentJob.record.filename}. Find it in Local models.`;
       pendingPlan = null;
     } else {
       $("#install-error").textContent = currentJob.error || currentJob.status;
@@ -465,7 +506,8 @@ async function loadInstalled() {
   try {
     const data = await api("/api/installed");
     installedModels = data.models;
-    $("#storage-root").textContent = data.root;
+      $("#storage-root").textContent = compactPath(data.root);
+    $("#storage-root").title = data.root;
     const total = data.models.reduce((sum, model) => sum + model.size_bytes, 0);
     $("#storage-summary").textContent = `${data.models.length} model${data.models.length === 1 ? "" : "s"} · ${formatBytes(total)}`;
     status.textContent = "";
@@ -525,7 +567,9 @@ function openAssignment(record) {
   $("#assign-error").textContent = "";
   document.querySelectorAll('input[name="purpose"]').forEach(input => { input.checked = false; });
   const license = record.license === "unknown" ? "No license was declared. Review the repository before commercial use." : `Declared license: ${record.license}. This metadata is not legal certification.`;
-  $("#assign-license").textContent = `${license} Source: ${record.source_url}`;
+  const source = safeExternalURL(record.source_url);
+  $("#assign-license").replaceChildren(make("span", "", `${license} `));
+  if (source) { const link = make("a", "", "Review source and inherited terms ↗"); link.href = source; link.target = "_blank"; link.rel = "noreferrer"; $("#assign-license").append(link); }
   $("#assign-dialog").showModal();
 }
 

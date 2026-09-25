@@ -71,19 +71,16 @@ async function openPreparation(kind, request) {
     if (!dialog.open || preparationKind !== kind) return;
     preparationPlan = plan;
     const list = make("dl", "review");
-    for (const [label, value] of preparationFacts(kind, plan)) {
-      list.append(make("dt", "", label), make("dd", "", String(value || "Unknown")));
-    }
-    list.append(make("dt", "", "Exact consent digest"), make("dd", "", plan.consent_digest));
+    reviewFacts(list, preparationFacts(kind, plan));
+    reviewFacts(list, [["Exact consent digest", plan.consent_digest]]);
     const note = make("p", "fine-print", plan.warning || "Toolchain installation and model execution have separate consent boundaries.");
     const summary = document.querySelector("#preparation-summary");
     summary.replaceChildren(list, note);
     const source = safeExternalURL(plan.source_url);
     if (source) { const link = make("a", "", "Review immutable source and license ↗"); link.href = source; link.target = "_blank"; link.rel = "noreferrer"; summary.append(link); }
-    if (kind === "convert") {
-      const linkURL = safeExternalURL(plan.license_url);
-      if (linkURL) { const link = make("a", "", "Review declared license ↗"); link.href = linkURL; link.target = "_blank"; link.rel = "noreferrer"; summary.append(link); }
-    }
+    const licenseSource = kind === "convert" ? plan : kind === "quantize" ? installedModels.find(model => model.path === plan.input) : null;
+    const linkURL = safeExternalURL(licenseSource?.license_url) || safeExternalURL(licenseSource?.source_url);
+    if (linkURL) { const link = make("a", "", "Review source and license terms ↗"); link.href = linkURL; link.target = "_blank"; link.rel = "noreferrer"; summary.append(link); }
   } catch (error) { document.querySelector("#preparation-error").textContent = error.message; }
 }
 document.querySelector("#install-quantizer").addEventListener("click", () => openPreparation("quantizer-toolchain", {}));
