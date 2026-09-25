@@ -143,7 +143,7 @@ The node must be in a processing scene tree to drain results. During pause, sign
 
 See [deployment](docs/DEPLOYMENT.md), [migration](docs/MIGRATION.md), [local GGUF benchmarking](docs/BENCHMARKING.md), the separate [model companion architecture](docs/MODEL_COMPANION.md), and the [implementation backlog](docs/ROADMAP.md).
 
-Bundled, pre-downloaded, and user-supplied local files work. The optional standalone `salmon-model` companion provides consented, hash-verified GGUF installation plus pinned `llama-quantize` toolchain management and execution without adding networking or preparation tooling to the GDExtension. The larger isolated, pinned source-conversion environment can also be consented, installed, verified, and removed; source download and conversion execution remain staged follow-up work. Never embed multi-GB weights in the native library.
+Bundled, pre-downloaded, and user-supplied local files work. The optional standalone `salmon-model` companion provides consented, hash-verified GGUF installation plus pinned `llama-quantize` toolchain management and execution without adding networking or preparation tooling to the GDExtension. The larger isolated, pinned conversion environment and separate `convert-plan` / `convert` consent workflow can also prepare verified Safetensors sources as F16/BF16 GGUFs. Generated outputs remain structurally checked, not runtime-certified; quantization requires a separate consent. Never embed multi-GB weights in the native library.
 
 ## Tests
 

@@ -70,6 +70,8 @@ type GeneratedMetadata struct {
 	DerivedFromSHA256    string
 	PreparationPreset    string
 	PreparationToolchain string
+	Origin               string
+	StructuralValidation string
 	Source               *Record
 }
 
@@ -391,9 +393,15 @@ func RegisterGenerated(root, filename string, metadata GeneratedMetadata) (Recor
 		SchemaVersion: 1, Repository: "local/generated", ResolvedSHA: metadata.DerivedFromSHA256,
 		Filename: localName, SizeBytes: metadata.SizeBytes, SHA256: strings.ToLower(metadata.SHA256),
 		License: "unknown", SourceURL: "", Path: expectedPath, InstalledAt: time.Now().UTC().Format(time.RFC3339),
-		StructuralValidation: "gguf-header-passed-after-quantization", RuntimeValidation: "not-run",
-		Origin: "quantized", DerivedFromSHA256: strings.ToLower(metadata.DerivedFromSHA256),
+		StructuralValidation: metadata.StructuralValidation, RuntimeValidation: "not-run",
+		Origin: metadata.Origin, DerivedFromSHA256: strings.ToLower(metadata.DerivedFromSHA256),
 		PreparationPreset: metadata.PreparationPreset, PreparationToolchain: metadata.PreparationToolchain,
+	}
+	if record.Origin == "" {
+		record.Origin = "generated"
+	}
+	if record.StructuralValidation == "" {
+		record.StructuralValidation = "gguf-header-passed-after-generation"
 	}
 	if metadata.Source != nil {
 		record.Repository = metadata.Source.Repository

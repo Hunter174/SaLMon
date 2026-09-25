@@ -59,7 +59,7 @@ func Assess(model hub.Model) Assessment {
 	hasGGUF := false
 	hasConfig, hasTokenizer := false, false
 	hasSafeTensors, hasPyTorch := false, false
-	allSourceWeightsHashed := true
+	allSafeTensorsHashed, allPyTorchHashed := true, true
 	for _, file := range model.Siblings {
 		name := strings.ToLower(file.Name)
 		size := file.Size
@@ -82,16 +82,31 @@ func Assess(model hub.Model) Assessment {
 			assessment.SourceWeightBytes += size
 			assessment.RequiredSourceFiles = append(assessment.RequiredSourceFiles, SourceFile{Name: file.Name, Role: "weights", SizeBytes: size, SHA256: file.ContentSHA256()})
 			if file.ContentSHA256() == "" {
-				allSourceWeightsHashed = false
+				allSafeTensorsHashed = false
 			}
 		case strings.HasSuffix(name, ".bin") || strings.HasSuffix(name, ".pth"):
 			hasPyTorch = true
 			assessment.SourceWeightBytes += size
 			assessment.RequiredSourceFiles = append(assessment.RequiredSourceFiles, SourceFile{Name: file.Name, Role: "weights", SizeBytes: size, SHA256: file.ContentSHA256()})
 			if file.ContentSHA256() == "" {
-				allSourceWeightsHashed = false
+				allPyTorchHashed = false
 			}
 		}
+	}
+	if hasSafeTensors && hasPyTorch {
+		filtered := assessment.RequiredSourceFiles[:0]
+		assessment.SourceWeightBytes = 0
+		for _, file := range assessment.RequiredSourceFiles {
+			lower := strings.ToLower(file.Name)
+			if file.Role == "weights" && (strings.HasSuffix(lower, ".bin") || strings.HasSuffix(lower, ".pth")) {
+				continue
+			}
+			filtered = append(filtered, file)
+			if file.Role == "weights" {
+				assessment.SourceWeightBytes += file.SizeBytes
+			}
+		}
+		assessment.RequiredSourceFiles = filtered
 	}
 	assessment.Actions = []Action{
 		{ID: "find_gguf", Label: "Find a GGUF variant", Available: true, Explanation: "Search Hugging Face for a repository that already provides GGUF files."},
@@ -116,8 +131,8 @@ func Assess(model hub.Model) Assessment {
 	if !hasSafeTensors && !hasPyTorch {
 		assessment.MissingRequirements = append(assessment.MissingRequirements, "supported source weights")
 	}
-	if (hasSafeTensors || hasPyTorch) && !allSourceWeightsHashed {
-		assessment.MissingRequirements = append(assessment.MissingRequirements, "SHA-256 metadata for every source-weight file")
+	if hasSafeTensors && !allSafeTensorsHashed || !hasSafeTensors && hasPyTorch && !allPyTorchHashed {
+		assessment.MissingRequirements = append(assessment.MissingRequirements, "SHA-256 metadata for every selected source-weight file")
 	}
 	if hasPyTorch && !hasSafeTensors {
 		assessment.Warnings = append(assessment.Warnings, "PyTorch pickle weights require a stricter isolated preparation policy; Safetensors is preferred.")

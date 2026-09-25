@@ -44,7 +44,7 @@ For repositories without GGUF files, `inspect` and the browser UI now compare de
 - multimodal-projector caveats because SaLMon's current API supports text and embeddings, not multimodal inputs;
 - distinct actions for finding a GGUF, using a local GGUF, and preparing source weights.
 
-The conversion action intentionally remains disabled until the separate pinned, consented toolchain from issue #18 is available. Recognition by the converter matrix is not runtime compatibility or output-quality certification. PyTorch pickle-only sources receive an additional isolation warning; arbitrary repository code and `trust_remote_code` remain prohibited.
+The CLI conversion action requires installation of the separate pinned, consented conversion toolchain and its own conversion consent; the browser action is not wired up yet. Recognition by the converter matrix is not runtime compatibility or output-quality certification. PyTorch pickle-only sources receive an additional isolation warning; arbitrary repository code and `trust_remote_code` remain prohibited.
 
 Maintainers regenerate the committed matrix after updating pinned llama.cpp with:
 
@@ -111,7 +111,16 @@ salmon-model conversion-toolchain-list [--root PATH]
 salmon-model conversion-toolchain-remove --id TOOLCHAIN_ID [--root PATH]
 ```
 
-Its platform-specific plan pins and displays standalone `uv` 0.7.12, Python 3.11.13 from python-build-standalone release 20250712, llama.cpp source commit `bf78f5439ee8e82e367674043303ebf8e92b4805`, each bootstrap archive's exact size and SHA-256, the dependency-lock SHA-256 and 27 exact package versions, a dependency-download allowance, and a conservative installed-size estimate. Installation accepts only binary wheels matching the embedded lock hashes, forces CPU-only PyTorch, disables Python auto-downloads and user site packages, confines caches and temporary files to staging, and applies a consented working-size bound. It retains the converter, `gguf-py`, and upstream licenses but does not install into system Python. A successful install must import NumPy, SentencePiece, Transformers, Torch, Protobuf, and the pinned local `gguf`, then execute converter help offline. The installed package tree, Python executable, and converter script are hashed and rechecked before reuse. Installation still does not authorize a model download or conversion run.
+Its platform-specific plan pins and displays standalone `uv` 0.7.12, Python 3.11.13 from python-build-standalone release 20250712, llama.cpp source commit `bf78f5439ee8e82e367674043303ebf8e92b4805`, each bootstrap archive's exact size and SHA-256, the dependency-lock SHA-256 and 27 exact package versions, a dependency working-space allowance, and a conservative installed-size estimate. Installation accepts only binary wheels matching the embedded lock hashes, forces CPU-only PyTorch, disables Python auto-downloads and user site packages, confines caches and temporary files to staging, and applies a consented working-size bound. It retains the converter, `gguf-py`, and upstream licenses but does not install into system Python. A successful install must import NumPy, SentencePiece, Transformers, Torch, Protobuf, and the pinned local `gguf`, then execute converter help offline. The installed package tree, Python executable, and converter script are hashed and rechecked before reuse. The installed converter copy explicitly patches all seven upstream `trust_remote_code=True` call sites to `False` and hashes the hardened copy. Installation still does not authorize a model download or conversion run.
+
+Source-model conversion has a further, independent consent boundary after installing the conversion environment:
+
+```sh
+salmon-model convert-plan --revision main --outtype f16 [--name FILE] [--root PATH] OWNER/REPOSITORY
+salmon-model convert --revision RESOLVED_SHA --outtype f16 --consent DIGEST [--name FILE] [--root PATH] OWNER/REPOSITORY
+```
+
+Use the exact `consent_digest` from the plan; `convert` re-inspects the immutable revision and fails if the plan differs. `--outtype bf16` is also supported. The CLI defaults to a 20 GiB aggregate source limit (`--max-source-bytes` can lower it); the plan includes a bounded output and working-space maximum. Git blob SHA-1 verifies small metadata files where upstream does not publish SHA-256; Safetensors weights require SHA-256. Preparation estimates and structural GGUF checks are not runtime/quality certification. The generated model can be passed to the separately consented `quantize-plan` / `quantize` commands.
 
 Optional quantizer-toolchain acquisition has its own consent boundary:
 
@@ -158,4 +167,4 @@ Creating a manifest does not export or copy weights. A later build-staging comma
 
 A direct GGUF candidate proceeds to the verified installation workflow from #7. A non-GGUF source remains preparation-only until its architecture and required files match the pinned llama.cpp converter's support matrix. Conversion and quantization are delegated to opt-in toolchains managed by the companion, never the GDExtension.
 
-The small `llama-quantize` acquisition and consented quantization paths remain independent from the much larger Python converter environment. The isolated environment can now be planned, installed, verified, inventoried, and removed. It does not yet download source repositories or run conversion; those operations require a separate exact `convert-plan` / `convert` contract before feeding generated GGUFs into the existing quantization and managed-registration path.
+The small `llama-quantize` acquisition and consented quantization paths remain independent from the much larger Python converter environment. The isolated environment can be planned, installed, verified, inventoried, and removed. A separate exact `convert-plan` / `convert` consent downloads only pinned, size- and content-verified root-level Safetensors, config, and tokenizer assets; rejects PyTorch pickle-only sources; and runs the hardened converter offline with cancellation and output/workspace bounds. The source is rehashed after conversion. Successful F16/BF16 output is structurally validated, content-addressed, and registered with inherited source provenance and `runtime_validation: not-run`. Optional subsequent quantization requires its own `quantize-plan` / `quantize` consent. Browser handoff remains unfinished.

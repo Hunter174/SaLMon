@@ -256,7 +256,8 @@ func Execute(ctx context.Context, plan Plan, consent, root string, maximumOutput
 	record, err := install.RegisterGenerated(root, destination, install.GeneratedMetadata{
 		Filename: plan.OutputFilename, SHA256: outputHash, SizeBytes: outputInfo.Size(),
 		DerivedFromSHA256: plan.InputSHA256, PreparationPreset: plan.Preset,
-		PreparationToolchain: plan.ToolchainID, Source: source,
+		PreparationToolchain: plan.ToolchainID, Origin: "quantized",
+		StructuralValidation: "gguf-header-passed-after-quantization", Source: source,
 	})
 	if err != nil {
 		if created {

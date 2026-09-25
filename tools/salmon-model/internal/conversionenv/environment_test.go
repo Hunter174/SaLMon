@@ -57,7 +57,7 @@ func useFakeCatalog(t *testing.T) (map[string][]byte, Platform) {
 	}
 	uv := zipBytes(t, map[string]string{executableName("uv"): "fake uv"})
 	python := zipBytes(t, map[string]string{filepath.ToSlash(filepath.Join("python", basePythonRelative())): "fake base python"})
-	source := zipBytes(t, map[string]string{"convert_hf_to_gguf.py": "fake converter", "gguf-py/gguf/__init__.py": "fake gguf"})
+	source := zipBytes(t, map[string]string{"convert_hf_to_gguf.py": strings.Repeat("trust_remote_code=True\n", 7), "gguf-py/gguf/__init__.py": "fake gguf"})
 	contents := map[string][]byte{"https://test/uv": uv, "https://test/python": python, "https://test/source": source}
 	makeArtifact := func(kind, url string, data []byte) Artifact {
 		hash := sha256.Sum256(data)
@@ -65,7 +65,7 @@ func useFakeCatalog(t *testing.T) (map[string][]byte, Platform) {
 	}
 	platforms[index].UV = makeArtifact("uv", "https://test/uv", uv)
 	platforms[index].Python = makeArtifact("python", "https://test/python", python)
-	platforms[index].MaximumDependencyBytes = 1 << 20
+	platforms[index].MaximumDependencyWorkingBytes = 1 << 20
 	platforms[index].EstimatedInstalledBytes = 2 << 20
 	sourceArtifact = makeArtifact("converter-source", "https://test/source", source)
 	return contents, platforms[index]

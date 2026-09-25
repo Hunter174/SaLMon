@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/conversionenv"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/convert"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/hub"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
@@ -221,6 +222,64 @@ func run(ctx context.Context, arguments []string) error {
 			return err
 		}
 		return outputWithSource("list", "local-installation-registry", map[string]any{"models": records})
+	case "convert-plan":
+		flags := flag.NewFlagSet("convert-plan", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		revision := flags.String("revision", "main", "branch, tag, or commit")
+		outtype := flags.String("outtype", "f16", "f16 or bf16")
+		name := flags.String("name", "", "optional managed output filename")
+		root := flags.String("root", "", "managed storage root")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 1 {
+			return errors.New("convert-plan requires one owner/repository argument")
+		}
+		model, err := client.Inspect(ctx, flags.Arg(0), *revision)
+		if err != nil {
+			return err
+		}
+		plan, err := convert.BuildPlan(ctx, model, *outtype, *name, *root, convert.Dependencies{})
+		if err != nil {
+			return err
+		}
+		return output("convert-plan", plan)
+	case "convert":
+		flags := flag.NewFlagSet("convert", flag.ContinueOnError)
+		flags.SetOutput(os.Stderr)
+		revision := flags.String("revision", "main", "branch, tag, or commit")
+		outtype := flags.String("outtype", "f16", "f16 or bf16")
+		name := flags.String("name", "", "optional managed output filename")
+		root := flags.String("root", "", "managed storage root")
+		consent := flags.String("consent", "", "digest from the exact convert-plan")
+		maximumBytes := flags.Int64("max-source-bytes", convert.DefaultMaximumSourceBytes, "hard aggregate source download limit")
+		if err := flags.Parse(arguments[1:]); err != nil {
+			return err
+		}
+		if flags.NArg() != 1 || *consent == "" {
+			return errors.New("convert requires --consent and one owner/repository argument")
+		}
+		model, err := client.Inspect(ctx, flags.Arg(0), *revision)
+		if err != nil {
+			return err
+		}
+		plan, err := convert.BuildPlan(ctx, model, *outtype, *name, *root, convert.Dependencies{})
+		if err != nil {
+			return err
+		}
+		lastReported := map[string]int64{}
+		record, err := convert.Execute(ctx, client, plan, *consent, *root, *maximumBytes, func(stage, message string, completed, total int64) {
+			key := stage + "\n" + message
+			if stage == "download" && completed != 0 && completed != total && completed-lastReported[key] < 8<<20 {
+				return
+			}
+			lastReported[key] = completed
+			_ = writeJSON(os.Stderr, map[string]any{"schema_version": 1, "event": "conversion_progress", "stage": stage, "message": message, "completed_bytes": completed, "total_bytes": total})
+		}, convert.Dependencies{})
+		if err != nil {
+			return err
+		}
+		return outputWithSource("convert", "verified-hugging-face-source-pinned-converter-and-managed-storage", record)
 	case "conversion-toolchain-plan":
 		flags := flag.NewFlagSet("conversion-toolchain-plan", flag.ContinueOnError)
 		flags.SetOutput(os.Stderr)
@@ -473,6 +532,8 @@ func usageError() error {
   salmon-model install --file FILE --consent DIGEST [--revision main] [--root PATH] OWNER/REPOSITORY
   salmon-model list [--root PATH]
   salmon-model remove --id INSTALLATION_ID [--root PATH]
+  salmon-model convert-plan [--revision REV] [--outtype f16|bf16] [--name FILE] [--root PATH] OWNER/REPOSITORY
+  salmon-model convert --consent DIGEST [--revision REV] [--outtype f16|bf16] [--name FILE] [--root PATH] OWNER/REPOSITORY
   salmon-model conversion-toolchain-plan [--root PATH]
   salmon-model conversion-toolchain-install --consent DIGEST [--root PATH]
   salmon-model conversion-toolchain-list [--root PATH]

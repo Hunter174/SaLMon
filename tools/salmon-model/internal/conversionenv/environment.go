@@ -27,22 +27,22 @@ import (
 const DefaultMaximumComponentBytes int64 = 128 << 20
 
 type Plan struct {
-	SchemaVersion                  int        `json:"schema_version"`
-	ToolchainID                    string     `json:"toolchain_id"`
-	Version                        string     `json:"version"`
-	OS                             string     `json:"os"`
-	Arch                           string     `json:"arch"`
-	UVVersion                      string     `json:"uv_version"`
-	PythonVersion                  string     `json:"python_version"`
-	ConverterCommit                string     `json:"converter_commit"`
-	Artifacts                      []Artifact `json:"artifacts"`
-	DependencyLockSHA256           string     `json:"dependency_lock_sha256"`
-	Dependencies                   []string   `json:"dependencies"`
-	MaximumDependencyDownloadBytes int64      `json:"maximum_dependency_download_bytes"`
-	EstimatedInstalledBytes        int64      `json:"estimated_installed_bytes"`
-	Destination                    string     `json:"destination"`
-	ConsentDigest                  string     `json:"consent_digest,omitempty"`
-	Warning                        string     `json:"warning"`
+	SchemaVersion                 int        `json:"schema_version"`
+	ToolchainID                   string     `json:"toolchain_id"`
+	Version                       string     `json:"version"`
+	OS                            string     `json:"os"`
+	Arch                          string     `json:"arch"`
+	UVVersion                     string     `json:"uv_version"`
+	PythonVersion                 string     `json:"python_version"`
+	ConverterCommit               string     `json:"converter_commit"`
+	Artifacts                     []Artifact `json:"artifacts"`
+	DependencyLockSHA256          string     `json:"dependency_lock_sha256"`
+	Dependencies                  []string   `json:"dependencies"`
+	MaximumDependencyWorkingBytes int64      `json:"maximum_dependency_working_bytes"`
+	EstimatedInstalledBytes       int64      `json:"estimated_installed_bytes"`
+	Destination                   string     `json:"destination"`
+	ConsentDigest                 string     `json:"consent_digest,omitempty"`
+	Warning                       string     `json:"warning"`
 }
 
 type Record struct {
@@ -96,7 +96,7 @@ func buildPlanFor(root, goos, goarch string) (Plan, error) {
 	plan := Plan{SchemaVersion: 1, ToolchainID: ToolchainID, Version: Version, OS: goos, Arch: goarch,
 		UVVersion: UVVersion, PythonVersion: PythonVersion, ConverterCommit: ConverterCommit,
 		Artifacts: []Artifact{platform.UV, platform.Python, sourceArtifact}, DependencyLockSHA256: lockHash,
-		Dependencies: packages, MaximumDependencyDownloadBytes: platform.MaximumDependencyBytes,
+		Dependencies: packages, MaximumDependencyWorkingBytes: platform.MaximumDependencyWorkingBytes,
 		EstimatedInstalledBytes: platform.EstimatedInstalledBytes,
 		Destination:             filepath.Join(root, "toolchains", ToolchainID, Version, goos+"-"+goarch),
 		Warning:                 "This optional isolated environment is large. It installs only hash-locked binary wheels and pinned converter source; it does not authorize model downloads or conversion execution."}
@@ -205,7 +205,7 @@ func Execute(ctx context.Context, plan Plan, consent, root string, maximumCompon
 	}
 	ggufPath := filepath.Join(filepath.Dir(converter), "gguf-py")
 	sitePackages := filepath.Join(staging, "site-packages")
-	if err := dependencies.Install(ctx, uv, basePython, sitePackages, lockPath, plan.MaximumDependencyDownloadBytes, plan.EstimatedInstalledBytes, progress); err != nil {
+	if err := dependencies.Install(ctx, uv, basePython, sitePackages, lockPath, plan.MaximumDependencyWorkingBytes, plan.EstimatedInstalledBytes, progress); err != nil {
 		return Record{}, err
 	}
 	if err := dependencies.Probe(ctx, basePython, converter, ggufPath, sitePackages); err != nil {
@@ -506,7 +506,7 @@ func runBounded(ctx context.Context, environment []string, directory string, tra
 			if transient > maximumTransient {
 				cancel()
 				<-done
-				return fmt.Errorf("conversion dependency downloads exceeded consented limit of %d bytes", maximumTransient)
+				return fmt.Errorf("conversion dependency working files exceeded consented limit of %d bytes", maximumTransient)
 			}
 		}
 	}
@@ -707,6 +707,12 @@ func pruneConverterSource(component string) error {
 	if err != nil {
 		return err
 	}
+	// The pinned upstream converter still has seven trust_remote_code=True call sites.
+	// Harden the installed copy; fail closed if upstream changes the expected patch.
+	if strings.Count(string(data), "trust_remote_code=True") != 7 {
+		return errors.New("pinned converter trust_remote_code patch no longer matches upstream")
+	}
+	data = []byte(strings.ReplaceAll(string(data), "trust_remote_code=True", "trust_remote_code=False"))
 	if err := os.WriteFile(filepath.Join(minimal, "convert_hf_to_gguf.py"), data, 0o600); err != nil {
 		return err
 	}
