@@ -24,6 +24,7 @@ import (
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/install"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/planner"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/project"
+	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/quantize"
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/recommend"
 )
 
@@ -382,7 +383,23 @@ func (s *Server) installed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"models": records, "root": s.root})
+	type localModel struct {
+		install.Record
+		Quantization quantize.Eligibility `json:"quantization"`
+	}
+	models := make([]localModel, 0, len(records))
+	for _, record := range records {
+		eligibility, err := quantize.InspectInput(record.Path)
+		if err != nil {
+			eligibility = quantize.Eligibility{Reason: "Could not inspect GGUF metadata: " + err.Error()}
+		}
+		if record.Origin == "quantized" {
+			eligibility.Eligible = false
+			eligibility.Reason = "Already quantized by SaLMon; start again from the original F16/BF16 GGUF"
+		}
+		models = append(models, localModel{Record: record, Quantization: eligibility})
+	}
+	writeJSON(w, 200, map[string]any{"models": models, "root": s.root})
 }
 
 func (s *Server) remove(w http.ResponseWriter, r *http.Request) {

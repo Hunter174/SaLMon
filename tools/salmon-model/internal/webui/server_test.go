@@ -132,6 +132,25 @@ func TestUIFlowAndStateChangingAuthorization(t *testing.T) {
 	if job.Status != "completed" || job.Record == nil || job.Record.SHA256 != hash {
 		t.Fatalf("installation job failed: %#v", job)
 	}
+	installedResponse, err := http.Get(uiServer.URL + "/api/installed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var installed struct {
+		Models []struct {
+			Quantization struct {
+				Eligible bool   `json:"eligible"`
+				Reason   string `json:"reason"`
+			} `json:"quantization"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(installedResponse.Body).Decode(&installed); err != nil {
+		t.Fatal(err)
+	}
+	installedResponse.Body.Close()
+	if len(installed.Models) != 1 || installed.Models[0].Quantization.Eligible || installed.Models[0].Quantization.Reason == "" {
+		t.Fatalf("uncertain GGUF must not be offered for quantization: %#v", installed)
+	}
 
 	manifestPath := filepath.Join(t.TempDir(), "salmon.models.json")
 	assignment, _ := json.Marshal(map[string]any{

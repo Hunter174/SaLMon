@@ -9,40 +9,57 @@ import (
 	"strings"
 )
 
-// Read only bounded GGUF metadata for a quantization preflight. This is not a
-// runtime compatibility probe: the pinned quantizer remains the final authority.
-func inputKind(path string) (string, string, error) {
+// Eligibility is a conservative preflight, not runtime or quality certification.
+type Eligibility struct {
+	Eligible     bool   `json:"eligible"`
+	Reason       string `json:"reason"`
+	Architecture string `json:"architecture,omitempty"`
+	Format       string `json:"format,omitempty"`
+}
+
+// InspectInput reads bounded GGUF metadata and tensor descriptors, not weights.
+// The pinned quantizer remains the final authority for supported architectures.
+func InspectInput(path string) (Eligibility, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", "", err
+		return Eligibility{}, err
 	}
 	defer file.Close()
 	reader := &metadataReader{r: io.LimitReader(file, 16<<20)}
 	header := make([]byte, 24)
 	if err := reader.read(header); err != nil {
-		return "", "", err
+		return Eligibility{}, err
 	}
 	if string(header[:4]) != "GGUF" {
-		return "", "", errors.New("not a GGUF file")
+		return Eligibility{}, errors.New("not a GGUF file")
 	}
+	tensors := binary.LittleEndian.Uint64(header[8:16])
 	count := binary.LittleEndian.Uint64(header[16:24])
-	if count == 0 || count > 65536 {
-		return "", "", errors.New("GGUF metadata count is missing or exceeds the preflight limit")
+	if count == 0 || count > 65536 || tensors == 0 || tensors > 1<<20 {
+		return Eligibility{}, errors.New("GGUF metadata or tensor count is missing or exceeds the preflight limit")
 	}
-	var architecture, kind string
+	var architecture, kind, format string
+	var fileType uint32
+	var hasFileType bool
 	for i := uint64(0); i < count; i++ {
 		key, err := reader.stringValue()
 		if err != nil {
-			return "", "", err
+			return Eligibility{}, err
 		}
 		typ, err := reader.uint32()
 		if err != nil {
-			return "", "", err
+			return Eligibility{}, err
 		}
-		if (key == "general.architecture" || key == "general.type") && typ == 8 {
+		if key == "general.file_type" && typ == 4 {
+			fileType, err = reader.uint32()
+			hasFileType = true
+			if err != nil {
+				return Eligibility{}, err
+			}
+		} else if (key == "general.architecture" || key == "general.type") && typ == 8 {
 			value, err := reader.stringValue()
 			if err != nil {
-				return "", "", err
+				return Eligibility{}, err
 			}
 			if key == "general.architecture" {
 				architecture = value
@@ -50,13 +67,53 @@ func inputKind(path string) (string, string, error) {
 				kind = value
 			}
 		} else if err := reader.skipValue(typ); err != nil {
-			return "", "", err
+			return Eligibility{}, err
 		}
 	}
 	if architecture == "" {
-		return "", "", errors.New("GGUF does not declare general.architecture")
+		return Eligibility{}, errors.New("GGUF does not declare general.architecture")
 	}
-	return architecture, kind, nil
+	if strings.EqualFold(architecture, "clip") || strings.EqualFold(kind, "mmproj") {
+		return Eligibility{Reason: "Multimodal projector, not main model weights; quantize a full-precision main-model GGUF instead", Architecture: architecture}, nil
+	}
+	if hasFileType && fileType != 0 && fileType != 1 && fileType != 32 {
+		return Eligibility{Reason: "Already quantized (GGUF file type); use original full-precision weights", Architecture: architecture}, nil
+	}
+	for i := uint64(0); i < tensors; i++ {
+		if _, err := reader.stringValue(); err != nil {
+			return Eligibility{}, err
+		}
+		dimensions, err := reader.uint32()
+		if err != nil {
+			return Eligibility{}, err
+		}
+		if dimensions == 0 || dimensions > 8 {
+			return Eligibility{}, errors.New("GGUF tensor has an invalid dimension count")
+		}
+		for j := uint32(0); j < dimensions; j++ {
+			if _, err := reader.uint64(); err != nil {
+				return Eligibility{}, err
+			}
+		}
+		tensorType, err := reader.uint32()
+		if err != nil {
+			return Eligibility{}, err
+		}
+		if tensorType != 0 && tensorType != 1 && tensorType != 30 { // ggml F32, F16, BF16
+			return Eligibility{Reason: "Already quantized or has unsupported tensor types; use original full-precision weights", Architecture: architecture}, nil
+		}
+		if _, err := reader.uint64(); err != nil { // tensor data offset
+			return Eligibility{}, err
+		}
+		if tensorType == 30 {
+			format = "BF16"
+		} else if tensorType == 1 && format == "" {
+			format = "F16"
+		} else if format == "" {
+			format = "F32"
+		}
+	}
+	return Eligibility{Eligible: true, Reason: "Full-precision tensor types found; quantizer support still requires execution", Architecture: architecture, Format: format}, nil
 }
 
 type metadataReader struct{ r io.Reader }
@@ -131,12 +188,12 @@ func (m *metadataReader) skipValue(typ uint32) error {
 }
 
 func checkQuantizableInput(path string) error {
-	architecture, kind, err := inputKind(path)
+	eligibility, err := InspectInput(path)
 	if err != nil {
 		return fmt.Errorf("cannot inspect quantization input: %w", err)
 	}
-	if strings.EqualFold(architecture, "clip") || strings.EqualFold(kind, "mmproj") {
-		return fmt.Errorf("GGUF is a multimodal projector (architecture %q, type %q), not a language-model weight file; quantize the main model GGUF instead", architecture, kind)
+	if !eligibility.Eligible {
+		return errors.New(eligibility.Reason)
 	}
 	return nil
 }

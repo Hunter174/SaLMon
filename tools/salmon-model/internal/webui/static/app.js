@@ -538,9 +538,10 @@ function localRow(record) {
   const remove = make("button", "danger", "Remove");
   remove.addEventListener("click", () => removeInstalled(record));
   actions.append(assign);
-  const isProjector = /(^|[\\/._-])mmproj([\\/._-]|$)/i.test(record.filename);
-  if (isProjector) metadata.append(make("span", "license-unknown", "Multimodal projector · not chat weights"));
-  if (record.origin !== "quantized" && !isProjector) {
+  const eligibility = record.quantization || { eligible: false, reason: "Quantization eligibility has not been checked" };
+  metadata.append(make("span", eligibility.eligible ? "validation-state" : "license-unknown",
+    eligibility.eligible ? `${eligibility.format || "Full precision"} · quantization can be planned` : `Quantization unavailable: ${eligibility.reason}`));
+  if (eligibility.eligible) {
     const quantizeButton = make("button", "secondary", "Quantize GGUF");
     quantizeButton.addEventListener("click", () => openPreparation("quantize", { installation_id: record.id, preset: "Q4_K_M" }));
     actions.append(quantizeButton);

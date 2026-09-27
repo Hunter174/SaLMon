@@ -22,7 +22,7 @@ func ggufWithKind(label, architecture, kind string) []byte {
 	var content bytes.Buffer
 	content.WriteString("GGUF")
 	_ = binary.Write(&content, binary.LittleEndian, uint32(3))
-	_ = binary.Write(&content, binary.LittleEndian, uint64(0)) // tensor count
+	_ = binary.Write(&content, binary.LittleEndian, uint64(1)) // tensor count
 	_ = binary.Write(&content, binary.LittleEndian, uint64(3)) // metadata count
 	for key, value := range map[string]string{"general.architecture": architecture, "general.type": kind, "test.label": label} {
 		_ = binary.Write(&content, binary.LittleEndian, uint64(len(key)))
@@ -31,6 +31,12 @@ func ggufWithKind(label, architecture, kind string) []byte {
 		_ = binary.Write(&content, binary.LittleEndian, uint64(len(value)))
 		content.WriteString(value)
 	}
+	_ = binary.Write(&content, binary.LittleEndian, uint64(6))
+	content.WriteString("tensor")
+	_ = binary.Write(&content, binary.LittleEndian, uint32(1)) // one dimension
+	_ = binary.Write(&content, binary.LittleEndian, uint64(16))
+	_ = binary.Write(&content, binary.LittleEndian, uint32(1)) // F16 tensor type
+	_ = binary.Write(&content, binary.LittleEndian, uint64(0)) // offset
 	if content.Len() < 256 {
 		content.Write(make([]byte, 256-content.Len()))
 	}
@@ -177,9 +183,46 @@ func TestPlanRejectsProjectorBeforeRunningQuantizer(t *testing.T) {
 		if err := os.WriteFile(input, ggufWithKind("projector", fixture.architecture, fixture.kind), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := BuildPlan(context.Background(), input, "Q4_K_M", "", root, dependencies); err == nil || !strings.Contains(err.Error(), "multimodal projector") {
+		if _, err := BuildPlan(context.Background(), input, "Q4_K_M", "", root, dependencies); err == nil || !strings.Contains(err.Error(), "Multimodal projector") {
 			t.Fatalf("projector %q/%q was not rejected: %v", fixture.architecture, fixture.kind, err)
 		}
+	}
+}
+
+func TestPlanRejectsAlreadyQuantizedFileTypeAndTensor(t *testing.T) {
+	root, input, _, dependencies := setupPlan(t)
+	content := ggufWithKind("already Q4", "llama", "model")
+	// Create the metadata directly to avoid relying on fixture map iteration.
+	var encoded bytes.Buffer
+	encoded.Write(content[:16])
+	_ = binary.Write(&encoded, binary.LittleEndian, uint64(2))
+	key := "general.architecture"
+	_ = binary.Write(&encoded, binary.LittleEndian, uint64(len(key)))
+	encoded.WriteString(key)
+	_ = binary.Write(&encoded, binary.LittleEndian, uint32(8))
+	_ = binary.Write(&encoded, binary.LittleEndian, uint64(5))
+	encoded.WriteString("llama")
+	key = "general.file_type"
+	_ = binary.Write(&encoded, binary.LittleEndian, uint64(len(key)))
+	encoded.WriteString(key)
+	_ = binary.Write(&encoded, binary.LittleEndian, uint32(4))
+	_ = binary.Write(&encoded, binary.LittleEndian, uint32(15)) // Q4_K_M
+	if err := os.WriteFile(input, encoded.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildPlan(context.Background(), input, "Q4_K_M", "", root, dependencies); err == nil || !strings.Contains(err.Error(), "Already quantized") {
+		t.Fatalf("already quantized file type was not rejected: %v", err)
+	}
+	// File type can be absent; reject quantized tensor descriptors as well.
+	// A Q4_K_M tensor uses ggml type 12.
+	content = ggufWithKind("tensor Q4", "llama", "model")
+	tensorTypeOffset := bytes.LastIndex(content, []byte("tensor")) + len("tensor") + 4 + 8
+	binary.LittleEndian.PutUint32(content[tensorTypeOffset:], 12)
+	if err := os.WriteFile(input, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildPlan(context.Background(), input, "Q4_K_M", "", root, dependencies); err == nil || !strings.Contains(err.Error(), "Already quantized") {
+		t.Fatalf("quantized tensor without file type was not rejected: %v", err)
 	}
 }
 
