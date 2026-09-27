@@ -318,13 +318,14 @@ function renderDetails(data) {
   files.append(make("h3", "", data.plan.gguf_files.length ? "Available files" : "No direct GGUF files"));
   data.plan.gguf_files.forEach(file => {
     const row = make("div", "file-row");
+    const isProjector = /(^|[\\/._-])mmproj([\\/._-]|$)/i.test(file.name);
     row.append(
       make("code", "", file.name),
-      make("span", "", file.quantization || "Unknown"),
+      make("span", "", isProjector ? "Projector" : file.quantization || "Unknown"),
       make("span", "", formatBytes(file.size_bytes)),
       fitElement(file)
     );
-    const installButton = make("button", "secondary", "Install");
+    const installButton = make("button", "secondary", isProjector ? "Install projector" : "Install");
     installButton.disabled = !file.sha256 || !file.size_bytes;
     installButton.title = installButton.disabled ? "A reported size and SHA-256 are required" : "Review this installation";
     installButton.addEventListener("click", () => prepareInstall(data.repository, file.name, data.resolved_sha));
@@ -537,7 +538,9 @@ function localRow(record) {
   const remove = make("button", "danger", "Remove");
   remove.addEventListener("click", () => removeInstalled(record));
   actions.append(assign);
-  if (record.origin !== "quantized") {
+  const isProjector = /(^|[\\/._-])mmproj([\\/._-]|$)/i.test(record.filename);
+  if (isProjector) metadata.append(make("span", "license-unknown", "Multimodal projector · not chat weights"));
+  if (record.origin !== "quantized" && !isProjector) {
     const quantizeButton = make("button", "secondary", "Quantize GGUF");
     quantizeButton.addEventListener("click", () => openPreparation("quantize", { installation_id: record.id, preset: "Q4_K_M" }));
     actions.append(quantizeButton);

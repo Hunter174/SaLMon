@@ -81,6 +81,9 @@ func BuildPlan(ctx context.Context, input, preset, outputName, root string, depe
 	if err := install.ValidateGGUF(absoluteInput); err != nil {
 		return Plan{}, fmt.Errorf("quantization input is not a structurally valid GGUF: %w", err)
 	}
+	if err := checkQuantizableInput(absoluteInput); err != nil {
+		return Plan{}, err
+	}
 	inputHash, err := install.HashFile(absoluteInput)
 	if err != nil {
 		return Plan{}, err
@@ -169,6 +172,9 @@ func Execute(ctx context.Context, plan Plan, consent, root string, maximumOutput
 		return install.Record{}, errors.New("quantization input type or size changed after consent")
 	}
 	if err := install.ValidateGGUF(plan.Input); err != nil {
+		return install.Record{}, err
+	}
+	if err := checkQuantizableInput(plan.Input); err != nil {
 		return install.Record{}, err
 	}
 	inputHash, err := install.HashFile(plan.Input)

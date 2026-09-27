@@ -1,6 +1,7 @@
 package quantize
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -15,12 +16,25 @@ import (
 	"github.com/Hunter174/SaLMon/tools/salmon-model/internal/toolchain"
 )
 
-func validGGUF(label string) []byte {
-	content := make([]byte, 128)
-	copy(content, "GGUF")
-	binary.LittleEndian.PutUint32(content[4:8], 3)
-	copy(content[8:], label)
-	return content
+func validGGUF(label string) []byte { return ggufWithKind(label, "llama", "model") }
+
+func ggufWithKind(label, architecture, kind string) []byte {
+	var content bytes.Buffer
+	content.WriteString("GGUF")
+	_ = binary.Write(&content, binary.LittleEndian, uint32(3))
+	_ = binary.Write(&content, binary.LittleEndian, uint64(0)) // tensor count
+	_ = binary.Write(&content, binary.LittleEndian, uint64(3)) // metadata count
+	for key, value := range map[string]string{"general.architecture": architecture, "general.type": kind, "test.label": label} {
+		_ = binary.Write(&content, binary.LittleEndian, uint64(len(key)))
+		content.WriteString(key)
+		_ = binary.Write(&content, binary.LittleEndian, uint32(8)) // string type
+		_ = binary.Write(&content, binary.LittleEndian, uint64(len(value)))
+		content.WriteString(value)
+	}
+	if content.Len() < 256 {
+		content.Write(make([]byte, 256-content.Len()))
+	}
+	return content.Bytes()
 }
 
 func testResolver(binaryPath string) ResolveFunc {
@@ -154,6 +168,18 @@ func TestProgressWriterThrottlesVerboseQuantizerOutput(t *testing.T) {
 	}
 	if !strings.Contains(writer.summary(), "metadata noise") {
 		t.Fatalf("error summary did not retain bounded diagnostic tail: %s", writer.summary())
+	}
+}
+
+func TestPlanRejectsProjectorBeforeRunningQuantizer(t *testing.T) {
+	root, input, _, dependencies := setupPlan(t)
+	for _, fixture := range []struct{ architecture, kind string }{{"clip", "mmproj"}, {"clip", ""}, {"gemma", "mmproj"}} {
+		if err := os.WriteFile(input, ggufWithKind("projector", fixture.architecture, fixture.kind), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := BuildPlan(context.Background(), input, "Q4_K_M", "", root, dependencies); err == nil || !strings.Contains(err.Error(), "multimodal projector") {
+			t.Fatalf("projector %q/%q was not rejected: %v", fixture.architecture, fixture.kind, err)
+		}
 	}
 }
 
