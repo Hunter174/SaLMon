@@ -99,10 +99,11 @@ static double median(std::vector<double> values) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        std::cerr << "Usage: salmon_agent_benchmark /absolute/path/to/chat-model.gguf\n";
+    if (argc < 2 || argc > 3 || (argc == 3 && std::string(argv[2]) != "--burst-only")) {
+        std::cerr << "Usage: salmon_agent_benchmark /absolute/path/to/chat-model.gguf [--burst-only]\n";
         return 2;
     }
+    const bool burst_only = argc == 3;
     try {
         Runtime runtime;
         Request load; load.operation = Operation::Load; load.path = argv[1]; load.purpose = "chat";
@@ -116,6 +117,7 @@ int main(int argc, char **argv) {
         std::cout << "Model " << loaded.result.model_name << ", load end-to-end "
                   << Millis(Clock::now() - load_start).count() << " ms, CPU only\n";
         report_memory("After load");
+        if (!burst_only) {
         std::cout << "fixture,expected,base,rotated,base_ms,rotated_ms,prompt_tokens\n";
         int correct = 0, stable = 0;
         std::vector<double> latencies;
@@ -175,6 +177,7 @@ int main(int argc, char **argv) {
         std::cout << "Counterfactual accuracy " << counterfactual_correct << '/' << pairs.size() * 2
                   << ", order stability " << counterfactual_stable << '/' << pairs.size()
                   << ", evidence-sensitive flips " << flip_pairs << '/' << pairs.size() / 2 << '\n';
+        }
         // Burst: eight different agents submit simultaneously to one worker and model.
         // End-to-end latency includes FIFO queue wait and caller polling; elapsed_ms does not.
         const auto cases = fixtures();
@@ -186,7 +189,7 @@ int main(int argc, char **argv) {
             if (!id) throw std::runtime_error("Burst queue full");
             submitted[id] = start;
         }
-        std::vector<double> response, service, queue_wait;
+        std::vector<double> response, service, queue_wait, poll_overhead;
         const auto burst_deadline = Clock::now() + std::chrono::minutes(4);
         while (!submitted.empty() && Clock::now() < burst_deadline) {
             for (const auto &event : runtime.poll()) {
@@ -196,15 +199,17 @@ int main(int argc, char **argv) {
                 if (event.kind == Event::Kind::Failed) throw std::runtime_error(event.error);
                 const double total = Millis(Clock::now() - found->second).count();
                 response.push_back(total); service.push_back(event.result.elapsed_ms);
-                queue_wait.push_back(std::max(0.0, total - event.result.elapsed_ms));
+                queue_wait.push_back(event.result.queue_ms);
+                poll_overhead.push_back(std::max(0.0, total - event.result.elapsed_ms - event.result.queue_ms));
                 submitted.erase(found);
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
         if (!submitted.empty()) throw std::runtime_error("Burst timed out");
         std::cout << "Eight-agent burst: first " << response.front() << " ms, last " << response.back()
-                  << " ms, median service " << median(service) << " ms, median queue+poll "
-                  << median(queue_wait) << " ms, last queue+poll " << queue_wait.back() << " ms\n";
+                  << " ms, median service " << median(service) << " ms, median queue "
+                  << median(queue_wait) << " ms, last queue " << queue_wait.back()
+                  << " ms, median submit/poll overhead " << median(poll_overhead) << " ms\n";
         Request many; many.operation = Operation::DecideMany; many.model = model; many.state = cases[0].state;
         many.questions = {{"favor", cases[0].question, cases[0].options},
                           {"verification", "What should Hesta do when a claim conflicts with the ledger?",

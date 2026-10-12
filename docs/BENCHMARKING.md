@@ -66,9 +66,10 @@ Build `salmon_agent_benchmark` and run it against an **external** chat-capable G
 ```text
 cmake --build build/native --target salmon_agent_benchmark --parallel
 build/native/salmon_agent_benchmark.exe C:/path/to/Qwen3-4B-Q4_K_M.gguf
+build/native/salmon_agent_benchmark.exe C:/path/to/Qwen3-4B-Q4_K_M.gguf --burst-only
 ```
 
-This CPU-only report checks 12 multi-role authored cases in two option orders, six paired authoritative-fact counterfactuals in two orders, one burst of eight agents sharing a single worker/model, and a two-question `decide_many`. It reports end-to-end response latency including queue+poll wait separately from backend service time; on Windows it prints process working set/private usage. These are **visible authored rubrics, not held-out quality tests**. See [agent decision validation](AGENT_DECISION_VALIDATION.md) for local results and limits. Neither favorable scores nor 8 burst samples establish p95, calibration, rendered frame times or broad NPC reliability.
+This CPU-only report checks 12 multi-role authored cases in two option orders, six paired authoritative-fact counterfactuals in two orders, one burst of eight agents sharing a single worker/model, and a two-question `decide_many`. It reports end-to-end response latency, native worker `queue_ms`, backend `elapsed_ms` and submit/poll overhead separately; on Windows it prints process working set/private usage. These are **visible authored rubrics, not held-out quality tests**. See [agent decision validation](AGENT_DECISION_VALIDATION.md) for local results and limits. Neither favorable scores nor 8 burst samples establish p95, calibration, rendered frame times or broad NPC reliability.
 
 ## V1 boundary
 

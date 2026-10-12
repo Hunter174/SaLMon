@@ -19,6 +19,10 @@ public:
     explicit Fake(std::shared_ptr<std::atomic_bool> started = {}) : started_(std::move(started)) {}
     Result execute(const Request &request, std::atomic_bool &cancelled, const Stream &stream) override {
         if (request.path == "throw") throw std::runtime_error("backend failure");
+        if (request.path == "delay") {
+            if (started_) started_->store(true);
+            std::this_thread::sleep_for(std::chrono::milliseconds(80));
+        }
         if (request.path == "wait") {
             if (started_) started_->store(true);
             while (!cancelled.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -88,6 +92,7 @@ int main() {
         require(streamed == "hello world", "Streaming must preserve bytes");
         require(finished == std::vector<Id>{first, second}, "FIFO ordering");
         require(events.back().kind == Event::Kind::Failed, "Backend errors must reach caller");
+        require(events[events.size() - 1].result.queue_ms >= 0, "Failed event must include queue wait");
         require(!runtime.cancel(first), "Consumed requests must be retired");
         request.path = "wait"; request.stream = false;
         const auto active = runtime.submit(request);
@@ -109,6 +114,22 @@ int main() {
             shutdown.submit(request);
             wait_started(started);
         } // destructor cancels + joins an actually active operation
+        {
+            auto busy = std::make_shared<std::atomic_bool>(false);
+            Runtime timed(std::make_unique<Fake>(busy));
+            Request delayed; delayed.path = "delay";
+            const Id first_id = timed.submit(delayed);
+            wait_started(busy);
+            delayed.path = "";
+            const Id second_id = timed.submit(delayed);
+            auto timed_events = wait_events(timed, 2);
+            require(timed_events[0].id == first_id && timed_events[1].id == second_id,
+                    "Queue metrics must preserve FIFO completion");
+            require(timed_events[1].result.queue_ms >= 40.0,
+                    "Queued request must report time spent behind active work");
+            require(timed_events[1].result.elapsed_ms >= 0.0,
+                    "Backend elapsed time must remain nonnegative");
+        }
         auto backend = make_llama_backend();
         std::atomic_bool cancelled{false};
         Request bad; bad.operation = Operation::Load; bad.path = "nonexistent.gguf";

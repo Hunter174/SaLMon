@@ -183,6 +183,7 @@ void Salmon::_process(double) {
             result["operation"] = operation_name(event.operation); result["model"] = event.model;
             result["model_path"] = gd(event.result.model_path); result["purpose"] = gd(event.result.purpose);
             result["elapsed_ms"] = event.result.elapsed_ms;
+            result["queue_ms"] = event.result.queue_ms;
             if (event.operation == salmon::Operation::Load) {
                 result["model_name"] = gd(event.result.model_name);
                 result["architecture"] = gd(event.result.architecture);

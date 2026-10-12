@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -58,6 +59,8 @@ struct Result {
     std::vector<DecisionAnswer> decisions;
     std::vector<std::vector<float>> embeddings;
     int prompt_tokens = 0, generated_tokens = 0;
+    // Wait between accepted submission and worker dequeue; excludes caller polling.
+    double queue_ms = 0;
     double elapsed_ms = 0, prompt_ms = 0, generation_ms = 0, time_to_first_token_ms = 0;
 };
 struct Event {
@@ -94,7 +97,11 @@ public:
     std::vector<Event> poll();
     static constexpr size_t capacity = 32;
 private:
-    struct Work { Request request; std::shared_ptr<std::atomic_bool> cancelled; };
+    struct Work {
+        Request request;
+        std::shared_ptr<std::atomic_bool> cancelled;
+        std::chrono::steady_clock::time_point enqueued_at;
+    };
     std::unique_ptr<Backend> backend_;
     std::mutex mutex_;
     std::condition_variable wake_;

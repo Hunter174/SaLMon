@@ -36,4 +36,6 @@ SALMON_EMBEDDING_MODEL=/absolute/path/all-MiniLM-L6-v2-Q4_K_M.gguf \
 Godot --headless --path tests/godot --script smoke.gd
 ```
 
-The script checks runtime behavior and score/vector shape. It is not a model-quality benchmark. The interactive semantic page explicitly labels its scores as conditional and uncalibrated.
+The script checks runtime behavior and score/vector shape, including the native `queue_ms` completion field. It is not a model-quality benchmark. The interactive semantic page explicitly labels its scores as conditional and uncalibrated.
+
+For an **optional non-headless synthetic render-responsiveness probe**, copy `agent_render_smoke.gd`, a `main.tscn` whose root is a Node2D using this script, `project.godot` pointing at that scene, and a freshly staged `addons/salmon/` into a temporary project. Run with `SALMON_CHAT_MODEL` set to an absolute external GGUF path under Godot 4.4.1 **without** `--headless`. It animates 400 rectangles at up to 60 FPS and measures wall-clock frame intervals while eight CPU decision requests queue up; it does not represent an actual game or certify its frame times. See [agent decision validation](../../docs/AGENT_DECISION_VALIDATION.md).

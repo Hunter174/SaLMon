@@ -62,7 +62,7 @@ Id Runtime::submit(Request request) {
     auto cancelled = std::make_shared<std::atomic_bool>(false);
     const Id id = request.id;
     pending_[id] = cancelled;
-    queue_.push_back({std::move(request), cancelled});
+    queue_.push_back({std::move(request), cancelled, std::chrono::steady_clock::now()});
     wake_.notify_one();
     return id;
 }
@@ -110,6 +110,7 @@ void Runtime::run() {
         Event event;
         event.id = work.request.id; event.model = work.request.model; event.operation = work.request.operation;
         const auto start = std::chrono::steady_clock::now();
+        const double queue_ms = std::chrono::duration<double, std::milli>(start - work.enqueued_at).count();
         try {
             if (work.cancelled->load()) throw std::runtime_error("Request cancelled");
             event.result = backend_->execute(work.request, *work.cancelled, [this, &work](const std::string &text) {
@@ -123,6 +124,7 @@ void Runtime::run() {
         } catch (...) {
             event.kind = Event::Kind::Failed; event.error = "Unknown backend failure";
         }
+        event.result.queue_ms = queue_ms;
         event.result.elapsed_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
         push(std::move(event));
     }

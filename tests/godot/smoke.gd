@@ -72,6 +72,7 @@ func run() -> void:
         await wait_for(model)
         check(completed.has(model), "Chat model load failed: " + str(failures.get(model, "")))
         if completed.has(model):
+            check(completed[model].has("queue_ms") and completed[model].queue_ms >= 0.0, "Load queue metric missing")
             var message := [{"role": "user", "content": "Say hello."}]
             var chat_id: int = runtime.chat(model, message, 16, true)
             await wait_for(chat_id)
@@ -85,6 +86,7 @@ func run() -> void:
             await wait_for(decision)
             check(completed.has(decision), "Decision failed")
             if completed.has(decision):
+                check(completed[decision].has("queue_ms") and completed[decision].queue_ms >= 0.0, "Decision queue metric missing")
                 var scores: PackedFloat32Array = completed[decision].scores
                 check(scores.size() == 2 and abs(scores[0] + scores[1] - 1.0) < 0.00001, "Invalid decision scores")
             var multiple: int = runtime.decide_many(model, "The player is hurt.", [
