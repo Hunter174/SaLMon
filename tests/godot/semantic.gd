@@ -1,5 +1,6 @@
 extends VBoxContainer
 
+const Policy = preload("res://agent_policy.gd")
 const OPTIONS := [
 	{"id": "honor_favor", "description": "Honor a verified past favor with a meaningful discount; use when the player invokes help they actually provided."},
 	{"id": "negotiate", "description": "Offer a small discount in response to a polite or reasonable request."},
@@ -24,6 +25,8 @@ var fear := 12
 var price_percent := 100
 var guards_nearby := true
 var caravan_quest_done := true
+# This dialogue-only demo has no authoritative combat event, so fighting is not a legal action.
+var physical_attack_active := false
 @onready var speech: LineEdit = $SpeechRow/Speech
 @onready var result: RichTextLabel = $Result
 
@@ -43,14 +46,31 @@ func _try_line(text: String) -> void:
 	speech.text = text
 	_run()
 
+func _legal_options() -> Array:
+	var actions := []
+	for option in OPTIONS:
+		var action: Dictionary = option.duplicate()
+		action["enabled"] = true
+		action["costs"] = {}
+		match option.id:
+			"honor_favor": action["requires"] = {"favor_verified": true}
+			"call_guards": action["requires"] = {"guards_nearby": true}
+			"fight": action["requires"] = {"physical_attack_active": true}
+			_: action["requires"] = {}
+		actions.append(action)
+	var facts := {"favor_verified": caravan_quest_done, "guards_nearby": guards_nearby,
+		"physical_attack_active": physical_attack_active, "inventory": {}, "reserved": {}}
+	return Policy.filter_actions(facts, actions).options
+
 func _run() -> void:
 	var player_line := speech.text.strip_edges()
 	if player_line.is_empty() or request_id != 0:
 		return
+	var options := _legal_options()
 	var state := """NPC: Hesta, proud town blacksmith. Trust: %d/100. Fear: %d/100. Current price: %d%%. Guards nearby: %s. Player really completed the ore-caravan quest: %s. Player says exactly: %s""" % [trust, fear, price_percent, guards_nearby, caravan_quest_done, player_line]
-	result.text = "[i]Reading the situation and scoring five legal reactions…[/i]"
+	result.text = "[i]Reading the situation and scoring %d admissible reactions…[/i]" % options.size()
 	request_id = ai.decide(_chat_model(), state,
-		"Which single reaction best fits Hesta, the verified facts, and the player's exact words?", OPTIONS)
+		"Which single reaction best fits Hesta, the verified facts, and the player's exact words?", options)
 	$SpeechRow/Judge.disabled = true
 
 func _resolve_runtime() -> void:
@@ -97,7 +117,7 @@ func _on_completed(id: int, data: Dictionary) -> void:
 			second_score = maxf(second_score, scores[i])
 	var selected: String = data.choice_id
 	var margin: float = scores[best_index] - second_score
-	var used_fallback := margin < 0.08
+	var used_fallback := margin < 0.08 or not _legal_options().any(func(option): return option.id == selected)
 	if used_fallback:
 		selected = "ask_clarification"
 	_apply_action(selected)
@@ -107,7 +127,7 @@ func _on_completed(id: int, data: Dictionary) -> void:
 		"[b]Executed action:[/b] %s%s" % [selected, " (safe low-margin fallback)" if used_fallback else ""],
 		"[b]Top-two margin:[/b] %.3f   [b]Latency:[/b] %d ms" % [margin, int(data.elapsed_ms)],
 		"",
-        "[color=#9fb3c8]All candidate scores (conditional, not calibrated):[/color]"
+		"[color=#9fb3c8]All candidate scores (conditional, not calibrated):[/color]"
 	]
 	for i in ids.size():
 		lines.append("  %-14s %.3f" % [ids[i], scores[i]])
