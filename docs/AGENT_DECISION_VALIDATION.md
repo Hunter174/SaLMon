@@ -1,6 +1,6 @@
 # Agent decision use-case: Qwen3-4B local validation
 
-Status: **prototype validated, not production-ready** (Windows 10, i7-10750H, 16 GB RAM, Quadro T2000 Max-Q 4 GB). Measurements from 2026-10-12; all experiments used the native CPU build (`SALMON_NATIVE=ON`, `SALMON_CUDA=OFF`, `SALMON_VULKAN=OFF`). Do not extrapolate these results to GPU or other hardware.
+Status: **local prototype integration validated; not yet highly functional under multi-agent load** (Windows 10, i7-10750H, 16 GB RAM, Quadro T2000 Max-Q 4 GB). Measurements from 2026-10-12; all experiments used the native CPU build (`SALMON_NATIVE=ON`, `SALMON_CUDA=OFF`, `SALMON_VULKAN=OFF`). Do not extrapolate these results to GPU or other hardware.
 
 ## Model provenance
 
@@ -26,11 +26,30 @@ Status: **prototype validated, not production-ready** (Windows 10, i7-10750H, 16
 
 These workloads are intentionally short and not representative of a fully populated NPC context. Repeated requests are recomputed without a prefix/KV cache. `decide_many` shares a single asynchronous submission/result but currently evaluates each question sequentially; two four-second questions are about eight seconds, **not** one four-second inference. It is unsuitable for per-frame or frequent per-NPC decisions on this CPU.
 
-## Release gates for this use case
+## Prototype agent workload (CPU-only, local)
 
-1. Use the verified Windows Godot 4.4.1 fresh-import path until #11/upstream Godot #111645 is resolved. **Windows 4.4.1 exported debug/release games now pass local checks**, including Qwen3-4B external GGUF load and `decide` in both builds. Use `tests/godot/export_smoke.py` with separately built debug/release DLLs and matching official export templates, optionally `--model /absolute/path/to/model.gguf`. The test copies the executable/PCK into an isolated installation outside the repository and moves Godot's exported DLL into `addons/salmon/bin/`, matching the descriptor's `res://` path. A previous false failure came from launching in the repository working directory, which loaded a different pre-existing local DLL. The model is not included in the export. Clean-machine testing and other platforms remain outstanding.
-2. This laptop's 4 GB VRAM is not a GPU benchmarking target for this use case. Set an explicit **CPU-only** interaction latency/throughput budget and benchmark representative agent contexts, several active agents, `decide_many`, scheduling, queue wait (not included in reported `elapsed_ms`), memory use, timeouts, cancellation, and rendering frame times. Consider lower-frequency offscreen ticks or a smaller model as fallback.
-3. Build a representative held-out decision suite for NPC relationships, competing goals, adversarial/ambiguous information and option permutations. Measure action quality and order bias, and calibrate option scores on outcome-labelled data before interpreting them as probabilities or applying confidence gates. Eight easy cases are not evidence of calibration.
-4. Verify low-memory behavior, corrupted/incompatible weights, offline operation, packaging of model license/notice and hash-verified model delivery. Do not ship the model in a PCK without extraction to a real path.
+Reproduce with `build/native/salmon_agent_benchmark.exe /absolute/path/to/Qwen3-4B-Q4_K_M.gguf` after building target `salmon_agent_benchmark`; weights are external. The benchmark uses one asynchronous `salmon::Runtime`, **one shared** Qwen3-4B Q4 model, CPU-only settings (1024 context, 256 batch, four generation threads, eight prompt threads), agent-specific states, 12 authored multi-role scenarios with two option orders, six paired counterfactual scenarios with two orders each, an eight-agent simultaneous burst, and a two-question `decide_many`. Windows memory values are the process's working set/private usage, not total system RAM or GPU VRAM. Outputs are reports, not CTest pass thresholds. Two consecutive local runs in October 2026 gave:
 
-SaLMon is already a usable **experimental** decision runtime for a turn-based/offscreen simulation with asynchronous results and deterministic gameplay fallbacks. It is **not** validated as production-ready for responsive, high-volume local NPC inference on this laptop.
+| Measurement | First run | Repeat run |
+| --- | ---: | ---: |
+| 12 authored scenarios × 2 orders | 24/24 rubric, 12/12 order stable | 24/24, 12/12 |
+| 6 paired counterfactuals × 2 scenarios × 2 orders | 20/24 rubric, 12/12 order stable, 4/6 pairs flipped | 20/24, 12/12, 4/6 |
+| Single authored decision end-to-end median | 4,225 ms | 4,266 ms |
+| Eight simultaneous agents: first / last completed | 4,403 / 33,352 ms | 4,291 / 32,616 ms |
+| Eight-agent median service / median queue+poll | 4,165 / 14,894 ms | 4,077 / 14,691 ms |
+| Two-question `decide_many` end-to-end | 8,792 ms | 7,934 ms |
+| Process working set after model load / peak after workload | not recorded | 3,559 / 4,278 MiB |
+| Process private usage after workload | not recorded | 2,055 MiB |
+
+**Observed failures in both runs:** Hesta incorrectly granted a discount despite the authoritative ledger refuting the buyer's claim; Sol incorrectly gave away a ration despite a four-for-four obligation. Both failures persisted in both option orders. The other paired cases (pass validity, medical priority, routes and courier authorization) flipped as authored. All examples are authored and visible to developers, not held-out training/evaluation data; the chosen answers are a local rubric rather than objective ground truth. These results **do not** prove general NPC quality, confidence calibration, safe policy adherence, or fairness. Game-side simulation rules must enforce authoritative ledger/resource constraints and action validity; SaLMon scores alone must not override those rules. Do not change the model prompt and quote these same cases as fresh validation without a separate held-out set.
+
+Practical implication: **do not** call this model every frame or submit every NPC in a crowded scene at once. Under a single worker the eighth result arrives after ~33 s on this laptop, even though individual inference is ~4 s; `result.elapsed_ms` excludes queue wait. A prototype can use low-frequency/offscreen turns, request throttling/priority, state-change caches, deterministic fallback actions and independent simulation ticks. Game frame-time under actual rendering, cancellation under load, high-context sessions, and memory pressure remain unmeasured; request budgets must be set for the intended interactions before making a readiness claim.
+
+## Local-prototype readiness gates for this use case
+
+1. Use the verified Windows Godot 4.4.1 fresh-import path until #11/upstream Godot #111645 is resolved. **Windows 4.4.1 exported debug/release games now pass local checks**, including Qwen3-4B external GGUF load and `decide` in both builds. Use `tests/godot/export_smoke.py` with separately built debug/release DLLs and matching official export templates, optionally `--model /absolute/path/to/model.gguf`. The test copies the executable/PCK into an isolated installation outside the repository and moves Godot's exported DLL into `addons/salmon/bin/`, matching the descriptor's `res://` path. A previous false failure came from launching in the repository working directory, which loaded a different pre-existing local DLL. The model is not included in the export. Distribution to another machine and other platforms are outside the present local-prototype goal.
+2. This laptop's 4 GB VRAM is not a GPU benchmarking target for this use case. Set an explicit **CPU-only** interaction latency/throughput budget, then validate scheduling, backpressure/queue wait, timeouts, cancellation, high-context memory use, and rendering frame times against it. The eight-agent burst measured above is too slow for on-demand crowded-scene behavior. Consider low-frequency offscreen ticks or a smaller model as fallback.
+3. Add game-authoritative policy enforcement for ledger obligations and scarce resources (the counterfactual failures above), then test the complete game-policy+SaLMon system against new held-out NPC scenarios, ambiguity/adversarial evidence and more option permutations. Calibrate option scores on outcome-labelled data before interpreting them as probabilities or applying confidence gates.
+4. Verify low-memory behavior, corrupted/incompatible weights, and offline operation on this machine. Keep weights in their verified external location; do not ship the model in a PCK without extraction to a real path.
+
+SaLMon is a usable **local prototype** decision runtime for turn-based/offscreen simulation with asynchronous results and deterministic gameplay fallbacks. It is **not** validated for responsive high-volume NPC inference on this laptop; the paired failures require game-policy guardrails before calling it highly functional for this use case.
