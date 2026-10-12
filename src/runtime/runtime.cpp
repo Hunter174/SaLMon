@@ -24,6 +24,15 @@ void validate_options(const std::vector<Option> &options) {
             throw std::invalid_argument("Options require unique nonempty IDs and nonempty descriptions");
     }
 }
+void validate_questions(const std::vector<DecisionQuestion> &questions) {
+    if (questions.empty() || questions.size() > 16) throw std::invalid_argument("decide_many requires 1–16 questions");
+    std::unordered_set<std::string> ids;
+    for (const auto &question : questions) {
+        if (question.id.empty() || question.question.empty() || !ids.insert(question.id).second)
+            throw std::invalid_argument("Questions require unique nonempty IDs and nonempty text");
+        validate_options(question.options);
+    }
+}
 size_t utf8_prefix_length(const std::string &bytes) {
     if (bytes.empty()) return 0;
     size_t start = bytes.size() - 1;

@@ -30,6 +30,7 @@ const char *operation_name(salmon::Operation operation) {
         case salmon::Operation::Unload: return "unload";
         case salmon::Operation::Chat: return "chat";
         case salmon::Operation::Decide: return "decide";
+        case salmon::Operation::DecideMany: return "decide_many";
         case salmon::Operation::Embed: return "embed";
     }
     return "unknown";
@@ -40,6 +41,7 @@ void Salmon::_bind_methods() {
     ClassDB::bind_method(D_METHOD("unload_model", "model"), &Salmon::unload_model);
     ClassDB::bind_method(D_METHOD("chat", "model", "messages", "max_tokens", "stream"), &Salmon::chat, DEFVAL(128), DEFVAL(false));
     ClassDB::bind_method(D_METHOD("decide", "model", "state", "question", "options"), &Salmon::decide);
+    ClassDB::bind_method(D_METHOD("decide_many", "model", "state", "questions"), &Salmon::decide_many);
     ClassDB::bind_method(D_METHOD("embed", "model", "texts"), &Salmon::embed);
     ClassDB::bind_method(D_METHOD("cancel", "request_id"), &Salmon::cancel);
     ClassDB::bind_method(D_METHOD("cancel_all"), &Salmon::cancel_all);
@@ -59,6 +61,10 @@ salmon::Id Salmon::submit(salmon::Request request) {
         check_string(request.path); check_string(request.state); check_string(request.question);
         for (const auto &message : request.messages) { check_string(message.role); check_string(message.content); }
         for (const auto &option : request.options) { check_string(option.id); check_string(option.description); }
+        for (const auto &question : request.questions) {
+            check_string(question.id); check_string(question.question);
+            for (const auto &option : question.options) { check_string(option.id); check_string(option.description); }
+        }
         for (const auto &text : request.texts) check_string(text);
         if (!runtime_) runtime_ = std::make_unique<salmon::Runtime>();
         const auto id = runtime_->submit(std::move(request));
@@ -130,6 +136,32 @@ int64_t Salmon::decide(int64_t model, const String &state, const String &questio
         return submit(std::move(request));
     } catch (const std::exception &error) { UtilityFunctions::push_error(gd(error.what())); return 0; }
 }
+int64_t Salmon::decide_many(int64_t model, const String &state, const Array &questions) {
+    try {
+        if (questions.is_empty() || questions.size() > 16) throw std::invalid_argument("decide_many requires 1–16 questions");
+        salmon::Request request; request.operation = salmon::Operation::DecideMany; request.model = model;
+        request.state = utf8(state);
+        if (request.state.empty()) throw std::invalid_argument("State cannot be empty");
+        for (int i = 0; i < questions.size(); ++i) {
+            if (questions[i].get_type() != Variant::DICTIONARY) throw std::invalid_argument("Questions must be dictionaries");
+            const Dictionary question = questions[i];
+            if (!question.has("options") || question["options"].get_type() != Variant::ARRAY)
+                throw std::invalid_argument("Question options must be an array");
+            salmon::DecisionQuestion item;
+            item.id = string_field(question, "id"); item.question = string_field(question, "question");
+            const Array options = question["options"];
+            if (options.size() < 2 || options.size() > 26) throw std::invalid_argument("Decisions require 2–26 options");
+            for (int j = 0; j < options.size(); ++j) {
+                if (options[j].get_type() != Variant::DICTIONARY) throw std::invalid_argument("Options must be dictionaries");
+                const Dictionary option = options[j];
+                item.options.push_back({string_field(option, "id"), string_field(option, "description")});
+            }
+            request.questions.push_back(std::move(item));
+        }
+        salmon::validate_questions(request.questions);
+        return submit(std::move(request));
+    } catch (const std::exception &error) { UtilityFunctions::push_error(gd(error.what())); return 0; }
+}
 int64_t Salmon::embed(int64_t model, const PackedStringArray &texts) {
     if (texts.is_empty() || texts.size() > 128) {
         UtilityFunctions::push_error("embed requires 1–128 texts");
@@ -173,6 +205,19 @@ void Salmon::_process(double) {
                 result["choice_id"] = gd(event.result.choice_id);
                 PackedStringArray ids; for (const auto &id : event.result.option_ids) ids.append(gd(id));
                 result["option_ids"] = ids; result["scores"] = floats(event.result.scores); result["logits"] = floats(event.result.logits);
+                result["probability_status"] = "conditional option scores; uncalibrated";
+                result["prompt_version"] = "salmon-decision-v1";
+            } else if (event.operation == salmon::Operation::DecideMany) {
+                Array answers;
+                for (const auto &item : event.result.decisions) {
+                    Dictionary answer;
+                    answer["id"] = gd(item.id); answer["choice_id"] = gd(item.choice_id);
+                    PackedStringArray ids; for (const auto &id : item.option_ids) ids.append(gd(id));
+                    answer["option_ids"] = ids; answer["scores"] = floats(item.scores); answer["logits"] = floats(item.logits);
+                    answer["prompt_tokens"] = item.prompt_tokens; answer["prompt_ms"] = item.prompt_ms;
+                    answers.append(answer);
+                }
+                result["decisions"] = answers;
                 result["probability_status"] = "conditional option scores; uncalibrated";
                 result["prompt_version"] = "salmon-decision-v1";
             } else if (event.operation == salmon::Operation::Embed) {

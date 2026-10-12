@@ -86,12 +86,23 @@ func _on_completed(request_id: int, result: Dictionary) -> void:
             {"id": "heal", "description": "Drink a healing potion"},
             {"id": "attack", "description": "Attack the enemy"}
         ])
+        ai.decide_many(chat_model, "A wounded rival remembers the player's mercy.", [
+            {"id": "action", "question": "What would this rival do now?", "options": [
+                {"id": "ally", "description": "Ask the player for help"},
+                {"id": "retreat", "description": "Hide and recover"}]},
+            {"id": "trust", "question": "How does the rival regard the player?", "options": [
+                {"id": "trust", "description": "Trust the player"},
+                {"id": "doubt", "description": "Remain wary"}]}
+        ])
     elif result.operation == "load" and result.model == embedding_model:
         ai.embed(embedding_model, PackedStringArray(["A quiet village", "A dangerous cave"]))
     elif result.operation == "chat":
         print(result.text)
     elif result.operation == "decide":
         print(result.choice_id, result.scores)
+    elif result.operation == "decide_many":
+        for answer in result.decisions:
+            print(answer.id, answer.choice_id, answer.scores)
     elif result.operation == "embed":
         print(result.embeddings)
 
@@ -112,6 +123,7 @@ All methods are called from the **main thread**. Submission methods return a pos
 | `unload_model(model)` | Frees the handle after earlier queued work |
 | `chat(model, messages, max_tokens=128, stream=false)` | Greedy text generation; roles: system/user/assistant |
 | `decide(model, state, question, options)` | Experimental choice among 2–26 unique IDs with descriptions |
+| `decide_many(model, state, questions)` | 1–16 unique `{id, question, options}` questions over the same state; each has 2–26 options |
 | `embed(model, texts)` | 1–128 texts; normalized pooled vectors in input order |
 | `cancel(request_id)` | Best-effort cooperative cancellation of queued/active work |
 | `cancel_all()` | Cancels outstanding work; does not unload already loaded models |
@@ -121,7 +133,7 @@ Every accepted request gets one terminal signal while the node is alive and proc
 - `request_completed(request_id, result)`
 - `request_failed(request_id, error)`
 
-Streaming additionally emits `token_received(request_id, text)`. Completion dictionaries include `operation`, `model`, `model_path`, `purpose`, and `elapsed_ms` (worker execution time, excluding queue wait). Chat adds `text` and `finish_reason`; decisions add `choice_id`, `option_ids`, `logits`, `scores`, `probability_status`, `prompt_version`; embeddings add `embeddings`.
+Streaming additionally emits `token_received(request_id, text)`. Completion dictionaries include `operation`, `model`, `model_path`, `purpose`, and `elapsed_ms` (worker execution time, excluding queue wait). Chat adds `text` and `finish_reason`; decisions add `choice_id`, `option_ids`, `logits`, `scores`, `probability_status`, `prompt_version`; `decide_many` adds an ordered `decisions` array with each question's `id`, `choice_id`, `option_ids`, `logits`, `scores`, `prompt_tokens`, and `prompt_ms`, plus the same probability status/version. Its top-level `prompt_tokens` and `prompt_ms` are sums of the per-question work. Embeddings add `embeddings`.
 
 A failed/cancelled load leaves no usable handle. A completed operation wins a cancellation race; cancellation does not undo an already completed load/unload. Partial streamed text may precede a cancelled chat. Errors are never returned as fake generated text.
 
@@ -132,7 +144,7 @@ The node must be in a processing scene tree to drain results. During pause, sign
 - Request text budget: 4 MiB; no NUL bytes. Chat: at most 256 messages, 1–32768 output tokens.
 - Context: 32–131072 tokens; `threads` and `threads_batch`: 1–256; batch: 1–context. `threads` controls single-token generation while `threads_batch` controls prompt and embedding evaluation. Practical limits are usually much smaller and hardware dependent.
 - `gpu_layers=0` means CPU; positive values request partial offload; `-1` requests full offload. Availability is not a guarantee of sufficient VRAM.
-- Every chat/decision currently starts from fresh state. Provide the complete conversation. Prefix caching is a follow-up, not implemented.
+- Every chat/decision currently starts from fresh state. Provide the complete conversation. `decide_many` is one queued request with one terminal result, but **evaluates its questions sequentially**, rebuilding the shared state for each question (no shared-prefix KV cache, no parallel model pass). It is not yet faster than equivalent individual decisions; cancellation between questions fails the entire request, without partial answers.
 - Chat uses deterministic greedy sampling in this first version; it does not preserve the old fixed temperature of 0.8.
 - Decisions score validated single-token **letter labels** at the formatted prompt boundary, without sampling output tokens. Option descriptions are input, not output labels. Unsupported token boundaries fail explicitly.
 - Decision scores sum to one **over the supplied choices**. They are not calibrated confidence, correctness guarantees, or a security boundary. This implements the SemIf-style pattern, not its exact prompts or benchmark claims.
@@ -141,7 +153,7 @@ The node must be in a processing scene tree to drain results. During pause, sign
 
 ## Deployment and migration
 
-See [deployment](docs/DEPLOYMENT.md), [migration](docs/MIGRATION.md), [local GGUF benchmarking](docs/BENCHMARKING.md), the separate [model companion architecture](docs/MODEL_COMPANION.md), and the [implementation backlog](docs/ROADMAP.md).
+See [deployment](docs/DEPLOYMENT.md), [migration](docs/MIGRATION.md), [local GGUF benchmarking](docs/BENCHMARKING.md), [Qwen3-4B agent decision validation and production gates](docs/AGENT_DECISION_VALIDATION.md), the separate [model companion architecture](docs/MODEL_COMPANION.md), and the [implementation backlog](docs/ROADMAP.md).
 
 Bundled, pre-downloaded, and user-supplied local files work. The optional standalone `salmon-model` companion provides consented, hash-verified GGUF installation plus pinned `llama-quantize` toolchain management and execution without adding networking or preparation tooling to the GDExtension. The larger isolated, pinned conversion environment and separate `convert-plan` / `convert` consent workflow can also prepare verified Safetensors sources as F16/BF16 GGUFs. Generated outputs remain structurally checked, not runtime-certified; quantization requires a separate consent. Never embed multi-GB weights in the native library.
 

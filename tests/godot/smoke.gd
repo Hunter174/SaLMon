@@ -43,6 +43,7 @@ func run() -> void:
         return
     runtime = ClassDB.instantiate("Salmon")
     root.add_child(runtime)
+    check(runtime.has_method("decide_many"), "Multi-decision API missing")
     runtime.request_completed.connect(on_completed)
     runtime.request_failed.connect(on_failed)
     runtime.token_received.connect(on_token)
@@ -86,6 +87,21 @@ func run() -> void:
             if completed.has(decision):
                 var scores: PackedFloat32Array = completed[decision].scores
                 check(scores.size() == 2 and abs(scores[0] + scores[1] - 1.0) < 0.00001, "Invalid decision scores")
+            var multiple: int = runtime.decide_many(model, "The player is hurt.", [
+                {"id": "heal", "question": "Which action restores health?", "options": [
+                    {"id": "potion", "description": "Drink a potion"}, {"id": "attack", "description": "Attack"}]},
+                {"id": "safety", "question": "Which action avoids danger?", "options": [
+                    {"id": "retreat", "description": "Leave"}, {"id": "charge", "description": "Charge"}]}
+            ])
+            await wait_for(multiple)
+            check(completed.has(multiple), "Multi-decision failed: " + str(failures.get(multiple, "")))
+            if completed.has(multiple):
+                var answers: Array = completed[multiple].decisions
+                check(answers.size() == 2, "Wrong multi-decision count")
+                if answers.size() == 2:
+                    check(answers[0].id == "heal" and answers[1].id == "safety", "Multi-decision IDs/order changed")
+                    for answer in answers:
+                        check(answer.scores.size() == 2 and abs(answer.scores[0] + answer.scores[1] - 1.0) < 0.00001, "Invalid multi-decision scores")
             var unload: int = runtime.unload_model(model)
             await wait_for(unload)
             var after_unload: int = runtime.chat(model, message, 8)

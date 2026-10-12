@@ -14,7 +14,7 @@
 
 namespace salmon {
 using Id = int64_t;
-enum class Operation { Load, Unload, Chat, Decide, Embed };
+enum class Operation { Load, Unload, Chat, Decide, DecideMany, Embed };
 struct Settings {
     int context = 2048;
     int threads = 4;       // Single-token autoregressive decoding.
@@ -25,6 +25,14 @@ struct Settings {
 };
 struct Message { std::string role, content; };
 struct Option { std::string id, description; };
+struct DecisionQuestion { std::string id, question; std::vector<Option> options; };
+struct DecisionAnswer {
+    std::string id, choice_id;
+    std::vector<std::string> option_ids;
+    std::vector<float> logits, scores;
+    int prompt_tokens = 0;
+    double prompt_ms = 0;
+};
 struct Request {
     Id id = 0;
     Id model = 0;
@@ -34,6 +42,7 @@ struct Request {
     std::vector<Message> messages;
     std::string state, question;
     std::vector<Option> options;
+    std::vector<DecisionQuestion> questions;
     std::vector<std::string> texts;
     int max_tokens = 128;
     bool stream = false;
@@ -46,6 +55,7 @@ struct Result {
     bool has_chat_template = false;
     std::vector<std::string> option_ids;
     std::vector<float> logits, scores;
+    std::vector<DecisionAnswer> decisions;
     std::vector<std::vector<float>> embeddings;
     int prompt_tokens = 0, generated_tokens = 0;
     double elapsed_ms = 0, prompt_ms = 0, generation_ms = 0, time_to_first_token_ms = 0;
@@ -67,6 +77,7 @@ public:
 std::unique_ptr<Backend> make_llama_backend();
 std::vector<float> conditional_softmax(const std::vector<float> &logits);
 void validate_options(const std::vector<Option> &options);
+void validate_questions(const std::vector<DecisionQuestion> &questions);
 // Return the complete UTF-8 prefix length, leaving a possible incomplete codepoint.
 size_t utf8_prefix_length(const std::string &bytes);
 

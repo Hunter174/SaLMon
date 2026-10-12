@@ -36,6 +36,18 @@ int main(int argc, char **argv) {
             const auto decision = backend->execute(request, cancelled, {});
             if (decision.scores.size() != 2 || std::abs(decision.scores[0] + decision.scores[1] - 1) > 1e-5) throw std::runtime_error("Invalid decision scores");
             std::cout << "Selected " << decision.choice_id << " (not an accuracy assertion)\n";
+            Request many; many.operation = Operation::DecideMany; many.model = 1; many.state = "The player is injured.";
+            many.questions = {{"health", "Which action restores health?", {{"heal", "Use a healing potion"}, {"attack", "Attack the enemy"}}},
+                              {"safety", "Which action avoids a fight?", {{"retreat", "Leave the area"}, {"fight", "Charge the enemy"}}}};
+            const auto batch = backend->execute(many, cancelled, {});
+            if (batch.decisions.size() != 2 || batch.decisions[0].id != "health" || batch.decisions[1].id != "safety" ||
+                batch.decisions[0].option_ids != std::vector<std::string>{"heal", "attack"} ||
+                batch.decisions[1].option_ids != std::vector<std::string>{"retreat", "fight"})
+                throw std::runtime_error("Invalid multi-decision ordering");
+            for (const auto &answer : batch.decisions) {
+                if (answer.scores.size() != 2 || std::abs(answer.scores[0] + answer.scores[1] - 1) > 1e-5)
+                    throw std::runtime_error("Invalid multi-decision scores");
+            }
         }
         request.operation = Operation::Unload;
         backend->execute(request, cancelled, {});

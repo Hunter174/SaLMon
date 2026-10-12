@@ -22,6 +22,7 @@ public:
     int64_t unload_model(int64_t model);
     int64_t chat(int64_t model, const godot::Array &messages, int max_tokens = 128, bool stream = false);
     int64_t decide(int64_t model, const godot::String &state, const godot::String &question, const godot::Array &options);
+    int64_t decide_many(int64_t model, const godot::String &state, const godot::Array &questions);
     int64_t embed(int64_t model, const godot::PackedStringArray &texts);
     bool cancel(int64_t request_id);
     void cancel_all();

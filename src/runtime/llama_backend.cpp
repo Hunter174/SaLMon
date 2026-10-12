@@ -142,6 +142,7 @@ public:
             if (session.purpose != "chat") throw std::invalid_argument("chat/decide require a chat model handle");
             if (request.operation == Operation::Chat) chat(session, request, cancelled, stream, result);
             else if (request.operation == Operation::Decide) decide(session, request, cancelled, result);
+            else if (request.operation == Operation::DecideMany) decide_many(session, request, cancelled, result);
             else throw std::invalid_argument("Unsupported operation");
         }
         check_cancel(cancelled);
@@ -282,6 +283,30 @@ private:
         result.scores = conditional_softmax(result.logits);
         const auto best = std::max_element(result.scores.begin(), result.scores.end()) - result.scores.begin();
         result.choice_id = result.option_ids[best];
+    }
+    void decide_many(Session &session, const Request &request, std::atomic_bool &cancelled, Result &result) {
+        if (request.state.empty()) throw std::invalid_argument("State cannot be empty");
+        validate_questions(request.questions);
+        for (const auto &question : request.questions) {
+            check_cancel(cancelled);
+            Request single;
+            single.state = request.state;
+            single.question = question.question;
+            single.options = question.options;
+            Result answer;
+            decide(session, single, cancelled, answer);
+            DecisionAnswer item;
+            item.id = question.id;
+            item.choice_id = std::move(answer.choice_id);
+            item.option_ids = std::move(answer.option_ids);
+            item.logits = std::move(answer.logits);
+            item.scores = std::move(answer.scores);
+            item.prompt_tokens = answer.prompt_tokens;
+            item.prompt_ms = answer.prompt_ms;
+            result.decisions.push_back(std::move(item));
+            result.prompt_tokens += answer.prompt_tokens; // total work, not shared-prefix tokens
+            result.prompt_ms += answer.prompt_ms;
+        }
     }
     void embed(Session &session, const Request &request, std::atomic_bool &cancelled, Result &result) {
         if (request.texts.empty() || request.texts.size() > 128) throw std::invalid_argument("embed requires 1–128 texts");

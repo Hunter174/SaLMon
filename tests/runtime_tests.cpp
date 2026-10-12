@@ -59,6 +59,13 @@ int main() {
         throws([] { conditional_softmax({std::numeric_limits<float>::infinity()}); });
         throws([] { conditional_softmax({std::numeric_limits<float>::quiet_NaN()}); });
         validate_options({{"a", "A"}, {"b", "B"}});
+        const DecisionQuestion valid{"goal", "What next?", {{"wait", "Wait"}, {"act", "Act"}}};
+        validate_questions({valid});
+        throws([] { validate_questions({}); });
+        throws([&] { validate_questions({valid, valid}); });
+        throws([&] { auto bad = valid; bad.id = ""; validate_questions({bad}); });
+        throws([&] { auto bad = valid; bad.options.pop_back(); validate_questions({bad}); });
+        throws([&] { auto bad = valid; bad.question = ""; validate_questions({bad}); });
         throws([] { validate_options({{"a", "A"}}); });
         throws([] { validate_options({{"a", "A"}, {"a", "B"}}); });
         throws([] { validate_options({{"a", "A"}, {"b", ""}}); });
