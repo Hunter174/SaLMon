@@ -48,4 +48,4 @@ Pin installed model identity/revision, architecture, intended purpose, tokenizer
 - Include SaLMoN and dependency/model notices; confirm redistribution rights.
 - Test missing/corrupt/incompatible models and low-memory conditions.
 - Verify offline operation after installation.
-- Resolve the known Windows first-import blocker (#11) before claiming production readiness.
+- For the Windows fresh-import path, only Godot 4.4.1 has passed local import and Qwen3-4B headless smoke tests. Godot 4.5.1, 4.5.2, and 4.7.2 fail a fresh headless import (see #11 and upstream Godot #111645). Restrict release validation to a verified engine version until a newer version passes the no-retry gate. Full exported-game checks are still pending.

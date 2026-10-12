@@ -1,6 +1,6 @@
 # SaLMoN — local AI for Godot
 
-SaLMoN is a Godot 4.4+ GDExtension for **chat generation, semantic decisions, and embeddings**, using local GGUF models through llama.cpp. No Python, cloud inference, API key, or network connection is required at runtime.
+SaLMoN is a GDExtension built against Godot 4.4 for **chat generation, semantic decisions, and embeddings**, using local GGUF models through llama.cpp. Windows Godot 4.4.1 fresh imports and real-model headless smoke pass; do **not** assume Godot 4.5+ fresh headless imports are supported (see [issue #11](https://github.com/Hunter174/SaLMon/issues/11)). No Python, cloud inference, API key, or network connection is required at runtime.
 
 **Development preview:** the runtime/API refactor is implemented, not a production release. Build from source; the historical DLL tracked in `addons/salmon/bin/` does **not** implement the new API. See [validation status](docs/VALIDATION.md), including the Windows first-import blocker, before shipping.
 
@@ -28,7 +28,7 @@ For MinGW add `-G "MinGW Makefiles"` on first configure. For exported release ga
 
 Copy **`build/dev/addon/addons/salmon/`** into your project's `addons/` directory. For the repository test project, explicitly stage the fresh extension with `cmake --build build/dev --target salmon_stage_godot_test`; ordinary builds remain out-of-tree. Build output never overwrites the historical checked-in binary. This is a GDExtension, not an editor plugin: there is no Plugins checkbox to enable.
 
-If Godot reports `Salmon` as an unknown node, the extension is not loaded: confirm the platform-matching binary exists under `addons/salmon/bin/`, close Godot, delete the project's `.godot/` cache, and reopen it. A fresh Windows/Godot 4.5.1 import crash can prevent that cache from being created; this is tracked in issue #11 and is separate from the runtime registration (which passes headless tests).
+If Godot reports `Salmon` as an unknown node, the extension is not loaded: confirm the platform-matching binary exists under `addons/salmon/bin/`, close Godot, delete the project's `.godot/` cache, and reopen it. A fresh Windows/Godot 4.5–4.7 headless editor import can crash due to an upstream Godot regression; use Godot 4.4.1 for the verified fresh-import path while [issue #11](https://github.com/Hunter174/SaLMon/issues/11) is open. Cached-project headless runtime tests do not certify first import.
 
 CPU execution is the default. Redistributable x86 builds do not require AVX2 by default. Optional build settings:
 
