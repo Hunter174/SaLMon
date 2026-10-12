@@ -124,15 +124,20 @@ def main():
             exported_dll = output_dir / (debug_dll.name if target == "debug" else release_dll.name)
             if not exported_dll.is_file():
                 raise RuntimeError(f"{target} export: expected DLL missing: {exported_dll}")
-            packaged_bin = output_dir / "addons" / "salmon" / "bin"
-            packaged_bin.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(exported_dll), packaged_bin / exported_dll.name)
-            environment = os.environ.copy()
-            environment.pop("SALMON_CHAT_MODEL", None)
-            if args.model:
-                environment["SALMON_CHAT_MODEL"] = args.model.resolve().as_posix()
-            run([str(output), "--headless"], f"{target} game", timeout=100 if args.model else 35,
-                cwd=output_dir, env=environment)
+            with ExportTemporaryDirectory(prefix=f"salmon-install-{target}-") as installation:
+                destination = Path(installation)
+                installed_exe = destination / output.name
+                shutil.copy2(output, installed_exe)
+                shutil.copy2(output.with_suffix(".pck"), destination / output.with_suffix(".pck").name)
+                packaged_bin = destination / "addons" / "salmon" / "bin"
+                packaged_bin.mkdir(parents=True)
+                shutil.move(str(exported_dll), packaged_bin / exported_dll.name)
+                environment = os.environ.copy()
+                environment.pop("SALMON_CHAT_MODEL", None)
+                if args.model:
+                    environment["SALMON_CHAT_MODEL"] = args.model.resolve().as_posix()
+                run([str(installed_exe), "--headless"], f"{target} game", timeout=100 if args.model else 35,
+                    cwd=destination, env=environment)
 
 
 if __name__ == "__main__":
